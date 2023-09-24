@@ -1,10 +1,16 @@
+import os, platform
 from flask import Flask, request, send_from_directory, abort, Response
 
 app = Flask(__name__)
 
-# config for game files directories 
-app.config['HOMM5'] = 'D:\\reversing\\homm5\\static\\homm5'
-app.config['SP3'] = 'D:\\reversing\\homm5\\static\\sp3'
+# config for game file directories 
+cur_dir = os.getcwd()
+if platform.system() == "Windows":
+    app.config['HOMM5'] = f'{cur_dir}\\static\\homm5'
+    app.config['SP3'] = f'{cur_dir}\\static\\sp3'
+else:
+    app.config['HOMM5'] = f'{cur_dir}/static/homm5'
+    app.config['SP3'] = f'{cur_dir}/static/sp3'
 
 @app.route('/<php_filename>', methods=['GET'])
 def get(php_filename: str) -> Response:

@@ -20,4 +20,3 @@ nupkg/
 *.txt
 *.bin
 *.config
-idbs/*
