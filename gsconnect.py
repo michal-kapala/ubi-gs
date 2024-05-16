@@ -34,6 +34,21 @@ def get(php_filename: str) -> Response:
                 # the game supplies 'user' parameter, e.g. 'noname'
                 user = dp = request.args.get('user')
 
+            case 'SPLINTERCELL3PC':
+                game = 'SP3'
+                ini_file = 'GS.ini'
+                user = dp = request.args.get('user')
+
+            case 'SPLINTERCELL3PCCOOP':
+                game = 'SP3'
+                ini_file = 'GS.ini'
+                user = dp = request.args.get('user')
+
+            case 'SPLINTERCELL3PCADVERS':
+                game = 'SP3'
+                ini_file = 'GS.ini'
+                user = dp = request.args.get('user')
+
             # Unknown
             case _:
                 print('Unknown game id')
