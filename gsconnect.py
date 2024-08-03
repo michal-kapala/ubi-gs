@@ -22,8 +22,8 @@ def get(php_filename: str) -> Response:
 
     if php_filename=='gsinit.php':
         match dp:
-            # Heroes of Might and Magic V
-            case 'HEROES_657d2c2ebadc6a1d':
+            # Heroes of Might and Magic V + TOTE
+            case 'HEROES_657d2c2ebadc6a1d' | 'HEROES_29988429c481f219':
                 game = 'HOMM5'
                 ini_file = 'servers.ini'
                 
