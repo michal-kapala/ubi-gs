@@ -1,4 +1,4 @@
-import os, platform
+import os, platform, re
 from flask import Flask, request, send_from_directory, abort, Response
 
 app = Flask(__name__)
@@ -20,10 +20,14 @@ def get(php_filename: str) -> Response:
     game = None
     ini_file = None
 
+    # remove HoMM5 hash
+    if re.search("^HEROES_[a-f0-9]{16}$", dp) is not None:
+        dp = "HEROES_5"
+
     if php_filename=='gsinit.php':
         match dp:
-            # Heroes of Might and Magic V + TOTE
-            case 'HEROES_657d2c2ebadc6a1d' | 'HEROES_29988429c481f219':
+            # Heroes of Might and Magic V + DLCs
+            case 'HEROES_5':
                 game = 'HOMM5'
                 ini_file = 'servers.ini'
                 
