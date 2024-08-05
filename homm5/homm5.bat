@@ -8,4 +8,7 @@ echo.
 echo Starting Router...
 start "Heroes of Might and Magic V - Router" python router.py
 echo.
+echo Starting CD Key...
+start "Heroes of Might and Magic V - CD Key" python cdkey.py
+echo.
 exit

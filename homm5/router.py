@@ -15,7 +15,8 @@ def start_server():
       # Receive the data in chunks and retransmit it
       while True:
         data = connection.recv(4096)
-        print(f"Received '{data}'")
+        print(f"Received {len(data)} bytes from {client_address}:")
+        print(data.hex(' '))
         if data:
           print("Sending data back to the client")
           connection.sendall(data)
