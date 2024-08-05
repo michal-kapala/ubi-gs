@@ -2,7 +2,6 @@ import socket
 from srp import SRPHeaderFlags, SRPRequest, SRPResponse
 
 SERVER_ADDRESS = ('localhost', 7781)
-RESPONSE_DATA = bytes([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09])
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(SERVER_ADDRESS)
 

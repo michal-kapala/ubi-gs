@@ -1,5 +1,6 @@
 import struct
 from enum import Enum
+from utils import write_u16
 
 SRP_HEADER_SIZE = 12
 """Length of SRP header in bytes."""
@@ -40,15 +41,15 @@ class SRPHeader:
   
   def __bytes__(self):
     result = bytearray()
-    result.extend(self.checksum.to_bytes(2, 'little'))
-    result.extend(self.signature.to_bytes(2, 'little'))
-    result.extend(self.data_size.to_bytes(2, 'little'))
+    result.extend(write_u16(self.checksum))
+    result.extend(write_u16(self.signature))
+    result.extend(write_u16(self.data_size))
     flags = 0
     for flag in self.flags:
       flags |= HEADER_FLAGS[flag]
-    result.extend(flags.to_bytes(2, 'little'))
-    result.extend(self.seg.to_bytes(2, 'little'))
-    result.extend(self.ack.to_bytes(2, 'little'))
+    result.extend(write_u16(flags))
+    result.extend(write_u16(self.seg))
+    result.extend(write_u16(self.ack))
     return bytes(result)
   
   def __read_flags(self, flags: int):
@@ -75,10 +76,10 @@ class SRPWindow:
     """
   
   def __bytes__(self):
-    result = bytearray(self.tail.to_bytes(2, 'little'))
-    result.extend(self.sender_sig.to_bytes(2, 'little'))
-    result.extend(self.checksum_init_val.to_bytes(2, 'little'))
-    result.extend(self.wnd_buf_size.to_bytes(2, 'little'))
+    result = bytearray(write_u16(self.tail))
+    result.extend(write_u16(self.sender_sig))
+    result.extend(write_u16(self.checksum_init_val))
+    result.extend(write_u16(self.wnd_buf_size))
     return bytes(result)
   
 class SRPRequest:
@@ -111,12 +112,12 @@ class SRPSegment:
   
   def from_req(req: SRPRequest):
     # header
-    checksum = bytes([0x00, 0x00])
+    checksum = write_u16(req.segment.window.checksum_init_val)
     signature = bytes([(req.segment.window.sender_sig & 0xff), (req.segment.window.sender_sig >> 8)])
     data_size = bytes([SRP_WINDOW_SIZE, 0x00])
-    flags = (SRPHeaderFlags.SRP_ID.value | SRPHeaderFlags.SYN.value | SRPHeaderFlags.ACK.value).to_bytes(2, 'little')
-    seg = (req.segment.header.seg + 1).to_bytes(2, 'little')
-    ack = req.segment.header.seg.to_bytes(2, 'little')
+    flags = write_u16(SRPHeaderFlags.SRP_ID.value | SRPHeaderFlags.SYN.value | SRPHeaderFlags.ACK.value)
+    seg = write_u16(req.segment.header.seg + 1)
+    ack = write_u16(req.segment.header.seg)
     data = bytearray(checksum + signature + data_size + flags + seg + ack)
     # window
     tail = bytes([0x0A, 0x00])
@@ -130,39 +131,25 @@ class SRPSegment:
     segment.header.checksum = checksum[0] + (checksum[1] << 8)
     return segment
   
-  def __make_checksum(self, segment: bytes):
+  def __make_checksum(self, data: bytes):
     """Calculates SRP checksum of the segment (u16)."""
     trunc_pos = 0
-    result = bytearray(len(segment))
-    trunc = bytearray(len(segment) - 2)
-    
-    # Copy arrays
-    for i in range(2, len(segment)):
-      trunc[i - 2] = segment[i]
-      result[i] = segment[i]
-
-    # Start with -1 initially - result checksum always misses 1 for some reason
-    check_base = 0xFFFFFFFF
-    half_len = len(trunc) >> 1
-    odd_len = len(trunc) % 2 > 0
+    check_base = 0
+    half_len = len(data) >> 1
+    odd_len = len(data) % 2 == 1
     
     if odd_len:
       # Add the first byte as extra
-      check_base += trunc[trunc_pos]
+      check_base += data[0]
       trunc_pos += 1
 
     if half_len > 0:
       for _ in range(half_len):
-        check_base += struct.unpack_from('<H', trunc, trunc_pos)[0]
+        check_base += struct.unpack_from('<H', data, trunc_pos)[0]
         trunc_pos += 2
 
     checksum = (~(check_base + (check_base >> 16) + ((check_base + (check_base >> 16)) >> 16))) & 0xFFFF
-    
-    checksum_bytes = struct.pack('<H', checksum)
-    result[0] = checksum_bytes[0]
-    result[1] = checksum_bytes[1]
-    
-    return bytes(result[:2])
+    return write_u16(checksum)
   
 class SRPResponse:
   """SRP response."""
