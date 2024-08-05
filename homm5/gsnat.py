@@ -1,4 +1,7 @@
-import socket
+import socket, sys, os
+# relative module import stuff
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(root_dir)
 from srp import SRPHeaderFlags, SRPRequest, SRPResponse
 
 SERVER_ADDRESS = ('localhost', 7781)
