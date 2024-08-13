@@ -1,7 +1,7 @@
 import utils
 from enum import Enum
 from blowfish import Cipher
-from data import List
+from data import List, Bin
 
 class MESSAGE_TYPE(Enum):
   NEWUSERREQUEST = 1
@@ -182,9 +182,8 @@ class ChallengeResponse(Response):
   def __init__(self, req: CDKeyMessage):
     super().__init__(req)
     self.msg_type = MESSAGE_TYPE.GSSUCCESS
-    hash_size = "2"
-    hash = "hi"
-    res_data = [hash_size, hash]
+    hash = b'\x00\x11\x22\x33\x44\x55\x66\x77\x88\x99\xaa\xbb\xcc\xdd\xee\xff\x01\x02\x03\x04'
+    res_data = [bytes(Bin(hash))]
     self.dl.lst[3].append(str(self.msg_type.value))
     self.dl.lst[3].append(res_data)
 

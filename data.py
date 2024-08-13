@@ -24,7 +24,7 @@ class Data(ABC):
     pass
 
   @abstractmethod
-  def from_buf(self, buf: bytearray):
+  def from_buf(buf: bytearray):
     """Creates an instance from the buffer."""
     pass
   
@@ -43,7 +43,6 @@ class String(Data):
     bts.append(0x00)
     return bytes(bts)
     
-  
   def from_buf(buf: bytearray):
     result = String()
     if buf[0] != 0x73: # delimiter
@@ -70,7 +69,7 @@ class List(Data):
         case "<class 'str'>":
           bts.extend(bytes(String(data)))
         case "<class 'bytes'>":
-          raise NotImplementedError('Binary type serialization not implemented yet')
+          bts.extend(bytes(Bin(data)))
         case "<class 'list'>":
           bts.extend(bytes(List(data)))
         case "<class 'int'>":
@@ -106,7 +105,7 @@ class List(Data):
     while len(buf) > 1 and buf[0] != 0x5D:
       match(chr(buf[0])):
         case 'b':
-          raise NotImplementedError('Binary type not implemented yet')
+          result.lst.append(Bin.from_buf(buf).bts)
         case 's':
           result.lst.append(String.from_buf(buf).string)
         case 'L':
@@ -119,4 +118,40 @@ class List(Data):
     # ]
     if not outer and buf[0] == 0x5D:
       buf.pop(0)
+    return result
+
+class Bin(Data):
+  """`clDataBin` implementation."""
+  def __init__(self, bts = bytes()):
+    super().__init__(DATA_TYPE.BIN)
+    self.bts = bts
+
+  def __str__(self):
+    return str(self.bts)
+  
+  def __bytes__(self):
+    bts = bytearray([0x62])
+    size = len(self.bts)
+    size_bts = bytes([
+      (size >> 24) & 0xFF,
+      (size >> 16) & 0xFF,
+      (size >> 8) & 0xFF,
+      size & 0xFF,
+    ])
+    bts.extend(size_bts)
+    bts.extend(self.bts)
+    return bytes(bts)
+  
+  def from_buf(buf: bytearray):
+    result = Bin()
+    if buf[0] != 0x62: # delimiter
+      return None
+    buf.pop(0) # b
+    size = (buf.pop(0) << 24) + (buf.pop(0) << 16) + (buf.pop(0) << 8) + buf.pop(0)
+    if len(buf) < size:
+      raise BufferError(f'Binary size exceeds the buffer by {size - len(buf)}')
+    bts = bytearray()
+    for _ in range(size):
+      bts.append(buf.pop(0))
+    result.bts = bts
     return result
