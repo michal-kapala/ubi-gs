@@ -15,6 +15,7 @@ See dedicated READMEs for service usage info:
 |:-:|:-:|
 | [`gsconnect`](gsconnect) | Common `gsconnect.ubisoft.com` web service |
 | [`homm5`](homm5) | GS game servers for Heroes of Might and Magic V |
+| [`tests`](tests) | Unit tests |
 
 Python 3 is required for running the scripts (3.11+ recommended).
 

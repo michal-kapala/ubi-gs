@@ -22,3 +22,11 @@ def write_u32_list(ints: list[int]):
     bts.append((i >> 16) & 0xff)
     bts.append((i >> 24) & 0xff)
   return bytes(bts)
+
+def read_u32_be(bts: bytes):
+  """Reads a big endian u32."""
+  return (bts[0] << 24) + (bts[1] << 16) + (bts[2] << 8) + bts[3]
+
+def write_u32_be(nb: int):
+  """Writes a big endian u32."""
+  return bytes([(nb >> 24) & 0xFF, (nb >> 16) & 0xFF, (nb >> 8) & 0xFF, nb & 0xFF])

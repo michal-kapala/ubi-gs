@@ -1,4 +1,8 @@
-import socket
+import socket, sys, os
+# relative module import stuff
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(root_dir)
+import cdkm
 
 SERVER_ADDRESS = ('localhost', 7780)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -7,5 +11,18 @@ print(f"CD Key server is listening on port {SERVER_ADDRESS[1]}")
 
 while True:
   data, address = sock.recvfrom(1024)
-  print(f"Received {len(data)} bytes from {address}:")
-  print(data.hex(' '))
+  req = cdkm.CDKeyMessage(data)
+  print(req)
+  match req.req_type:
+    case cdkm.REQUEST_TYPE.CHALLENGE:
+      res = cdkm.ChallengeResponse(req)
+      print(res)
+      sock.sendto(res.to_buf(), address)
+    case cdkm.REQUEST_TYPE.ACTIVATION:
+      raise NotImplementedError("Activation requests are unsupported")
+    case cdkm.REQUEST_TYPE.AUTH:
+      raise NotImplementedError("Authorization requests are unsupported")
+    case cdkm.REQUEST_TYPE.VALIDATION:
+      raise NotImplementedError("Validation requests are unsupported")
+    case cdkm.REQUEST_TYPE.PLAYER_STATUS:
+      raise NotImplementedError("Player status requests are unsupported")
