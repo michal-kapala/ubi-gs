@@ -1,4 +1,8 @@
-import socket
+import socket, sys, os
+# relative module import stuff
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(root_dir)
+import gsm
 
 SERVER_ADDRESS = ('localhost', 7777)
 
@@ -12,13 +16,11 @@ def start_server():
     connection, client_address = sock.accept()
     print(f"Connection from {client_address}")
     try:
-      # Receive the data in chunks and retransmit it
       while True:
         data = connection.recv(4096)
-        print(f"Received {len(data)} bytes from {client_address}:")
-        print(data.hex(' '))
         if data:
-          print("Sending data back to the client")
+          req = gsm.GSMessage(data)
+          print(req)
           connection.sendall(data)
         else:
           print("No more data from", client_address)
