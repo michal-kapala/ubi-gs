@@ -21,7 +21,7 @@ while True:
     case cdkm.REQUEST_TYPE.AUTH:
       res = cdkm.AuthResponse(req)
     case cdkm.REQUEST_TYPE.VALIDATION:
-      raise NotImplementedError("Validation requests are unsupported")
+      res = cdkm.ValidationResponse(req)
     case cdkm.REQUEST_TYPE.PLAYER_STATUS:
       raise NotImplementedError("Player status requests are unsupported")
 

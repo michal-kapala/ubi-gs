@@ -133,6 +133,12 @@ class MESSAGE_TYPE(Enum):
   SETGROUPSZDATA = 211
   GROUPSZDATA = 212
 
+class CDKEY_PLAYER_STATUS(Enum):
+  """Player status."""
+  E_PLAYER_UNKNOWN = 0
+  E_PLAYER_INVALID = 1
+  E_PLAYER_VALID = 2
+
 class REQUEST_TYPE(Enum):
   """CD-Key service requests."""
   CHALLENGE = 1
@@ -149,7 +155,7 @@ class CDKeyMessage:
     self.size = utils.read_u32_be(bts[1:5])
     self.dl: List = List.from_buf(bytearray(BLOWFISH.decrypt(bts[5:])))
     if len(self.dl.lst) < 4:
-      raise BufferError("Received incomplete message")
+      raise BufferError(f"Received incomplete message: {self.dl.lst}")
     self.msg_id = int(self.dl.lst[0])
     self.req_type = REQUEST_TYPE(int(self.dl.lst[1]))
     self.unknown = int(self.dl.lst[2])
@@ -207,5 +213,15 @@ class AuthResponse(Response):
     self.msg_type = MESSAGE_TYPE.GSSUCCESS
     auth_id = b'\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55'
     res_data = [bytes(Bin(auth_id))]
+    self.dl.lst[3].append(str(self.msg_type.value))
+    self.dl.lst[3].append(res_data)
+
+class ValidationResponse(Response):
+  def __init__(self, req: CDKeyMessage):
+    super().__init__(req)
+    self.msg_type = MESSAGE_TYPE.GSSUCCESS
+    status = CDKEY_PLAYER_STATUS.E_PLAYER_VALID
+    buf = b'\x66\x66\x66\x66\x66\x66\x66\x66\x66\x66\x66'
+    res_data = [str(status.value), bytes(Bin(buf))]
     self.dl.lst[3].append(str(self.msg_type.value))
     self.dl.lst[3].append(res_data)
