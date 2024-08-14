@@ -16,13 +16,14 @@ while True:
   match req.req_type:
     case cdkm.REQUEST_TYPE.CHALLENGE:
       res = cdkm.ChallengeResponse(req)
-      print(res)
-      sock.sendto(res.to_buf(), address)
     case cdkm.REQUEST_TYPE.ACTIVATION:
-      raise NotImplementedError("Activation requests are unsupported")
+      res = cdkm.ActivationResponse(req)
     case cdkm.REQUEST_TYPE.AUTH:
       raise NotImplementedError("Authorization requests are unsupported")
     case cdkm.REQUEST_TYPE.VALIDATION:
       raise NotImplementedError("Validation requests are unsupported")
     case cdkm.REQUEST_TYPE.PLAYER_STATUS:
       raise NotImplementedError("Player status requests are unsupported")
+
+  print(res)
+  sock.sendto(res.to_buf(), address)

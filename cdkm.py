@@ -162,8 +162,12 @@ class Response:
   """Base class for CDKM responses."""
   def __init__(self, req: CDKeyMessage):
     self.type = req.type
+    self.req_type = req.req_type
     self.size = 0
     self.dl = List([str(req.msg_id), str(req.req_type.value), str(req.unknown), []])
+
+  def __repr__(self):
+    return f"<{self.req_type.name} RES:\t{str(self.dl)}>"
 
   def to_buf(self) -> bytes:
     """Serializes the response into a CDKeyMessage buffer."""
@@ -187,5 +191,12 @@ class ChallengeResponse(Response):
     self.dl.lst[3].append(str(self.msg_type.value))
     self.dl.lst[3].append(res_data)
 
-  def __repr__(self):
-    return f"<CHALLENGE RES:\t{str(self.dl)}>"
+class ActivationResponse(Response):
+  def __init__(self, req: CDKeyMessage):
+    super().__init__(req)
+    self.msg_type = MESSAGE_TYPE.GSSUCCESS
+    buf1 = b'\x33\x33\x33\x33\x33\x33\x33\x33\x33\x33\x33'
+    buf2 = b'\x44\x44\x44\x44\x44\x44\x44\x44\x44\x44\x44'
+    res_data = [bytes(Bin(buf1)), bytes(Bin(buf2))]
+    self.dl.lst[3].append(str(self.msg_type.value))
+    self.dl.lst[3].append(res_data)

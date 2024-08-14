@@ -153,5 +153,5 @@ class Bin(Data):
     bts = bytearray()
     for _ in range(size):
       bts.append(buf.pop(0))
-    result.bts = bts
+    result.bts = bytes(bts)
     return result
