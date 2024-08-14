@@ -146,6 +146,8 @@ class REQUEST_TYPE(Enum):
   AUTH = 3
   VALIDATION = 4
   PLAYER_STATUS = 5
+  DISCONNECT_USER = 6
+  STILL_ALIVE = 7
 
 BLOWFISH = Cipher("SKJDHF$0maoijfn4i8$aJdnv1jaldifar93-AS_dfo;hjhC4jhflasnF3fnd")
 
@@ -154,12 +156,11 @@ class CDKeyMessage:
     self.type = bts[0]
     self.size = utils.read_u32_be(bts[1:5])
     self.dl: List = List.from_buf(bytearray(BLOWFISH.decrypt(bts[5:])))
-    if len(self.dl.lst) < 4:
-      raise BufferError(f"Received incomplete message: {self.dl.lst}")
     self.msg_id = int(self.dl.lst[0])
     self.req_type = REQUEST_TYPE(int(self.dl.lst[1]))
-    self.unknown = int(self.dl.lst[2])
-    self.inner_dl = self.dl.lst[3]
+    if self.req_type != REQUEST_TYPE.STILL_ALIVE:
+      self.unknown = int(self.dl.lst[2])
+      self.inner_dl = self.dl.lst[3]
     
   def __repr__(self) -> str:
     return f"<{self.req_type.name}:\t{str(self.dl)}>"

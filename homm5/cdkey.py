@@ -4,6 +4,7 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import cdkm
 
+NOTIFS = [cdkm.REQUEST_TYPE.DISCONNECT_USER, cdkm.REQUEST_TYPE.STILL_ALIVE]
 SERVER_ADDRESS = ('localhost', 7780)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(SERVER_ADDRESS)
@@ -24,6 +25,11 @@ while True:
       res = cdkm.ValidationResponse(req)
     case cdkm.REQUEST_TYPE.PLAYER_STATUS:
       raise NotImplementedError("Player status requests are unsupported")
+    case cdkm.REQUEST_TYPE.DISCONNECT_USER:
+      raise NotImplementedError("Disconnection requests are unsupported")
+    case cdkm.REQUEST_TYPE.STILL_ALIVE:
+      pass
 
-  print(res)
-  sock.sendto(res.to_buf(), address)
+  if req.req_type not in NOTIFS:
+    print(res)
+    sock.sendto(res.to_buf(), address)
