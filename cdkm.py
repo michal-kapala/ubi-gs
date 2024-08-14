@@ -195,8 +195,17 @@ class ActivationResponse(Response):
   def __init__(self, req: CDKeyMessage):
     super().__init__(req)
     self.msg_type = MESSAGE_TYPE.GSSUCCESS
-    buf1 = b'\x33\x33\x33\x33\x33\x33\x33\x33\x33\x33\x33'
+    activation_id = b'\x33\x33\x33\x33\x33\x33\x33\x33\x33\x33\x33'
     buf2 = b'\x44\x44\x44\x44\x44\x44\x44\x44\x44\x44\x44'
-    res_data = [bytes(Bin(buf1)), bytes(Bin(buf2))]
+    res_data = [bytes(Bin(activation_id)), bytes(Bin(buf2))]
+    self.dl.lst[3].append(str(self.msg_type.value))
+    self.dl.lst[3].append(res_data)
+
+class AuthResponse(Response):
+  def __init__(self, req: CDKeyMessage):
+    super().__init__(req)
+    self.msg_type = MESSAGE_TYPE.GSSUCCESS
+    auth_id = b'\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55\x55'
+    res_data = [bytes(Bin(auth_id))]
     self.dl.lst[3].append(str(self.msg_type.value))
     self.dl.lst[3].append(res_data)
