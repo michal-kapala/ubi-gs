@@ -1,7 +1,7 @@
 # Unit tests
 Tests for critical and easily testable modules.
 
-## Running 
+## Usage
 ```
 python -m unittest
 ```

@@ -19,7 +19,7 @@ def start_server():
       while True:
         data = connection.recv(4096)
         if data:
-          req = gsm.GSMessage(data)
+          req = gsm.Message(data)
           print(req)
           connection.sendall(data)
         else:

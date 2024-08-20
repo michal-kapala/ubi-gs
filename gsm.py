@@ -1,4 +1,6 @@
 from enum import Enum
+import gsxor
+from data import List
 
 GSMSG_HEADER_SIZE = 6
 """Length of GSMessage header in bytes."""
@@ -134,7 +136,8 @@ class MESSAGE_TYPE(Enum):
   LOBBYSERVERLOGIN = 210
   SETGROUPSZDATA = 211
   GROUPSZDATA = 212
-  ENCRYPTED_MSG = 219
+  KEY_EXCHANGE = 219
+  REQUESTPORTID = 221
 
 class SENDER_RECEIVER(Enum):
   """GSMessage sender/receiver types."""
@@ -149,20 +152,36 @@ class SENDER_RECEIVER(Enum):
   G = 9
   A = 10
 
+class PROPERTY(Enum):
+  """Used implementation of the message."""
+  GS = 0
+  GAME = 1
+  GS_ENCRYPT = 2
+
 class GSMessageHeader:
   def __init__(self, bts: bytes):
     self.size = (bts[0] << 16) + (bts[1] << 8) + bts[2]
-    self.property = bts[3] >> 6
-    self.priority = bts[3] & 0x3f
+    self.property = PROPERTY(bts[3] >> 6)
+    self.priority = bts[3] & 0x3F
     self.type = MESSAGE_TYPE(bts[4])
     self.sender = SENDER_RECEIVER(bts[5] >> 4)
     self.receiver = SENDER_RECEIVER(bts[5] & 0x0F)
 
-class GSMessage:
-  """Game Service message implementation."""
+class Message:
+  """Common message implementation."""
   def __init__(self, bts: bytes):
     self.header = GSMessageHeader(bts[:GSMSG_HEADER_SIZE])
-    self.data = bts[GSMSG_HEADER_SIZE:]
+    self.dl = None
+    match self.header.property:
+      case PROPERTY.GS:
+        if self.header.type != MESSAGE_TYPE.STILLALIVE:
+          dec = gsxor.decrypt(bts[GSMSG_HEADER_SIZE:])
+          self.dl = List.from_buf(bytearray(dec))
+      case PROPERTY.GAME:
+        pass
+      case PROPERTY.GS_ENCRYPT:
+        pass
 
   def __repr__(self):
-    return f"<{self.header.type.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>"
+    payload = self.dl or ""
+    return f"<{self.header.type.name}\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}"

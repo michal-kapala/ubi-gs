@@ -4,6 +4,9 @@ from blowfish import Cipher
 from data import List, Bin
 from gsm import MESSAGE_TYPE
 
+CDKM_HEADER_SIZE = 5
+"""Length of `CDKeyMessage` header in bytes."""
+
 class CDKEY_PLAYER_STATUS(Enum):
   """Player status."""
   E_PLAYER_UNKNOWN = 0
@@ -25,8 +28,8 @@ BLOWFISH = Cipher("SKJDHF$0maoijfn4i8$aJdnv1jaldifar93-AS_dfo;hjhC4jhflasnF3fnd"
 class CDKeyMessage:
   def __init__(self, bts: bytes):
     self.type = bts[0]
-    self.size = utils.read_u32_be(bts[1:5])
-    self.dl: List = List.from_buf(bytearray(BLOWFISH.decrypt(bts[5:])))
+    self.size = utils.read_u32_be(bts[1:CDKM_HEADER_SIZE])
+    self.dl: List = List.from_buf(bytearray(BLOWFISH.decrypt(bts[CDKM_HEADER_SIZE:])))
     self.msg_id = int(self.dl.lst[0])
     self.req_type = REQUEST_TYPE(int(self.dl.lst[1]))
     if self.req_type != REQUEST_TYPE.STILL_ALIVE:
