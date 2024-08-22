@@ -32,4 +32,4 @@ while True:
 
   if req.req_type not in NOTIFS:
     print(res)
-    sock.sendto(res.to_buf(), address)
+    sock.sendto(bytes(res), address)

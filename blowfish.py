@@ -1,4 +1,4 @@
-import utils
+import secrets, utils
 
 ORIG_P = [
   0x243F6A88, 0x85A308D3, 0x13198A2E, 0x03707344,
@@ -281,7 +281,7 @@ class Blowfish:
   """Blowfish implementation rewritten from https://github.com/Rupan/blowfish."""
   N = 16
 
-  def __init__(self, key: str):
+  def __init__(self, key: bytes):
     self.P = []
     for nb in ORIG_P:
       self.P.append(nb)
@@ -331,14 +331,14 @@ class Blowfish:
     xl ^= self.P[0]
     return xl & 0xFFFFFFFF, xr & 0xFFFFFFFF
 
-  def __init(self, key: str):
+  def __init(self, key: bytes):
     key_len = len(key)
 
     j = 0
     for i in range(self.N + 2):
       data = 0x00000000
       for k in range(4):
-        data = ((data << 8) | ord(key[j])) & 0xFFFFFFFF
+        data = ((data << 8) | key[j]) & 0xFFFFFFFF
         j += 1
         if j >= key_len:
           j = 0
@@ -363,7 +363,7 @@ class Blowfish:
 class Cipher:
   """Game Service implementation of Blowfish encryption."""
 
-  def __init__(self, key: str):
+  def __init__(self, key: bytes):
     self.bf = Blowfish(key)
 
   def encrypt(self, src: bytes):
@@ -404,3 +404,6 @@ class Cipher:
     
     buf = utils.write_u32_list(ints)[:org_size]
     return buf
+
+  def keygen(len: int):
+    return secrets.token_bytes(len)

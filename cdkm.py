@@ -23,7 +23,7 @@ class REQUEST_TYPE(Enum):
   DISCONNECT_USER = 6
   STILL_ALIVE = 7
 
-BLOWFISH = Cipher("SKJDHF$0maoijfn4i8$aJdnv1jaldifar93-AS_dfo;hjhC4jhflasnF3fnd")
+BLOWFISH = Cipher(bytes("SKJDHF$0maoijfn4i8$aJdnv1jaldifar93-AS_dfo;hjhC4jhflasnF3fnd", 'utf8'))
 
 class CDKeyMessage:
   def __init__(self, bts: bytes):
@@ -50,7 +50,7 @@ class Response:
   def __repr__(self):
     return f"<{self.req_type.name} RES:\t{str(self.dl)}>"
 
-  def to_buf(self) -> bytes:
+  def __bytes__(self):
     """Serializes the response into a CDKeyMessage buffer."""
     buf = bytearray()
     buf.append(self.type)
@@ -61,7 +61,7 @@ class Response:
     self.size = len(dl)
     buf.extend(utils.write_u32_be(self.size))
     buf.extend(dl)
-    return buf
+    return bytes(buf)
 
 class ChallengeResponse(Response):
   def __init__(self, req: CDKeyMessage):

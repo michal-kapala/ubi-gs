@@ -1,5 +1,5 @@
 from enum import Enum
-import gsxor
+import blowfish, gsxor, pkc, tcp, utils
 from data import List
 
 GSMSG_HEADER_SIZE = 6
@@ -159,6 +159,7 @@ class PROPERTY(Enum):
   GS_ENCRYPT = 2
 
 class GSMessageHeader:
+  """Header for `GSMessage` and `GSEncryptMessage`."""
   def __init__(self, bts: bytes):
     self.size = (bts[0] << 16) + (bts[1] << 8) + bts[2]
     self.property = PROPERTY(bts[3] >> 6)
@@ -167,21 +168,94 @@ class GSMessageHeader:
     self.sender = SENDER_RECEIVER(bts[5] >> 4)
     self.receiver = SENDER_RECEIVER(bts[5] & 0x0F)
 
+  def __bytes__(self):
+    result = bytearray(GSMSG_HEADER_SIZE)
+    size = utils.write_u24_be(self.size)
+    result[0] = size[0]
+    result[1] = size[1]
+    result[2] = size[2]
+    result[3] &= 0x1F
+    result[3] |= self.property.value << 6
+    result[3] |= self.priority & 0x20
+    result[4] = self.type.value
+    result[5] &= 0xF
+    result[5] |= 0x10 * self.sender.value
+    result[5] &= 0xF0
+    result[5] |= self.receiver.value & 0xF
+    return bytes(result)
+
 class Message:
   """Common message implementation."""
-  def __init__(self, bts: bytes):
+  def __init__(self, bts: bytes, bf_key: bytes):
     self.header = GSMessageHeader(bts[:GSMSG_HEADER_SIZE])
     self.dl = None
     match self.header.property:
       case PROPERTY.GS:
         if self.header.type != MESSAGE_TYPE.STILLALIVE:
           dec = gsxor.decrypt(bts[GSMSG_HEADER_SIZE:])
-          self.dl = List.from_buf(bytearray(dec))
+          self.dl: List = List.from_buf(bytearray(dec))
       case PROPERTY.GAME:
         pass
       case PROPERTY.GS_ENCRYPT:
-        pass
+        dec = blowfish.Cipher(bf_key).decrypt(bts[GSMSG_HEADER_SIZE:])
+        self.dl: List = List.from_buf(bytearray(dec))
 
   def __repr__(self):
     payload = self.dl or ""
     return f"<{self.header.type.name}\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}"
+
+class GSMResponse:
+  """Base class for GS message responses."""
+  def __init__(self, req: Message):
+    self.header = req.header
+    self.header.sender, self.header.receiver = self.header.receiver, self.header.sender
+    self.dl: List = None
+
+  def __bytes__(self):
+    bts = bytearray()
+    dl = None
+    if self.dl is not None:
+      dl = bytearray(bytes(self.dl))
+      dl.pop(0)
+      dl.pop()
+      match self.header.property:
+        case PROPERTY.GS:
+          dl = gsxor.encrypt(bytes(dl))
+          self.header.size = GSMSG_HEADER_SIZE + len(dl)
+        case PROPERTY.GS_ENCRYPT:
+          raise NotImplementedError("GS_ENCRYPT message serialization unsupported.")
+
+    bts.extend(bytes(self.header))
+    if dl is not None:
+      bts.extend(dl)
+    return bytes(bts)
+
+  def __repr__(self):
+    payload = self.dl or ""
+    return f"<{self.header.type.name} RES\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}>"
+
+class KeyExchangeResponse(GSMResponse):
+  """Response to `KEY_EXCHANGE` messages."""
+  def __init__(self, req: Message, client: tcp.TcpClient):
+    if req.header.type != MESSAGE_TYPE.KEY_EXCHANGE:
+      raise TypeError(f"KeyExchangeResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    req_id = int(req.dl.lst[0])
+    match req_id:
+      case 1:
+        self.dl = List(['1', ['1']])
+        pub_key: pkc.RsaPublicKey = pkc.RsaPublicKey.from_pubkey(client.sv_pubkey)
+        buf = bytes(pub_key)
+        self.dl.lst[1].append(str(len(buf)))
+        self.dl.lst[1].append(buf)
+      case 2:
+        self.dl = List(['2', ['1']])
+        bf_key = blowfish.Cipher.keygen(16)
+        client.sv_bf_key = bf_key
+        enc_key = pkc.encrypt(bf_key, client.game_pubkey)
+        self.dl.lst[1].append(str(len(enc_key)))
+        self.dl.lst[1].append(enc_key)
+      case 3:
+        raise NotImplementedError("KEY_EXCHANGE disconnections are not implemented.")
+      case _:
+        raise BufferError(f"KEY_EXCHANGE request with req_id={req_id}.")
