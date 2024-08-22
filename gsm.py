@@ -191,7 +191,7 @@ class Message:
     self.dl = None
     match self.header.property:
       case PROPERTY.GS:
-        if self.header.type != MESSAGE_TYPE.STILLALIVE:
+        if self.header.size > GSMSG_HEADER_SIZE:
           dec = gsxor.decrypt(bts[GSMSG_HEADER_SIZE:])
           self.dl: List = List.from_buf(bytearray(dec))
       case PROPERTY.GAME:
@@ -232,7 +232,7 @@ class GSMResponse:
 
   def __repr__(self):
     payload = self.dl or ""
-    return f"<{self.header.type.name} RES\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}>"
+    return f"<{self.header.type.name} RES\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}"
 
 class KeyExchangeResponse(GSMResponse):
   """Response to `KEY_EXCHANGE` messages."""
@@ -259,3 +259,15 @@ class KeyExchangeResponse(GSMResponse):
         raise NotImplementedError("KEY_EXCHANGE disconnections are not implemented.")
       case _:
         raise BufferError(f"KEY_EXCHANGE request with req_id={req_id}.")
+
+class LoginResponse(GSMResponse):
+  """Response to `LOGIN` messages."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOGIN:
+      raise TypeError(f"LoginResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.GSSUCCESS
+    msg_id = MESSAGE_TYPE.LOGIN.value
+    self.dl = List([msg_id.to_bytes(1, 'little')])
+    self.header.size = len(bytes(self.dl))

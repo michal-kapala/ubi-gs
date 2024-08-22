@@ -16,7 +16,8 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
     case gsm.MESSAGE_TYPE.STILLALIVE:
       pass
     case gsm.MESSAGE_TYPE.LOGIN:
-      pass
+      # todo: actual user auth here
+      res = gsm.LoginResponse(req)
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
       match req.dl.lst[0]:
         case '1':
