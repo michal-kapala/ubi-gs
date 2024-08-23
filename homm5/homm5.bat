@@ -11,4 +11,7 @@ echo.
 echo Starting CD Key...
 start "Heroes of Might and Magic V - CD Key" python cdkey.py
 echo.
+echo Starting Router Wait Module...
+start "Heroes of Might and Magic V - Router (Wait Module)" python router_wm.py
+echo.
 exit

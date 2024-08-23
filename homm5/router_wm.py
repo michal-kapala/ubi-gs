@@ -4,11 +4,8 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, pkc, tcp
 
-SERVER_ADDRESS = ('localhost', 7777)
-"""Address of the router service."""
-
-WAIT_MODULE = ("127.0.0.1", 7782)
-"""Address of the wait module service the game will be redirected to."""
+SERVER_ADDRESS = ('localhost', 7782)
+"""Address of the router's wait module service."""
 
 CLIENTS: list[tcp.TcpClient] = []
 """Global list of connected game clients."""
@@ -19,11 +16,8 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
   match req.header.type:
     case gsm.MESSAGE_TYPE.STILLALIVE:
       pass
-    case gsm.MESSAGE_TYPE.JOINWAITMODULE:
-      res = gsm.JoinWaitModuleResponse(req, WAIT_MODULE)
-    case gsm.MESSAGE_TYPE.LOGIN:
-      # todo: actual user auth here
-      res = gsm.LoginResponse(req)
+    case gsm.MESSAGE_TYPE.LOGINWAITMODULE:
+      res = gsm.LoginWaitModuleResponse(req)
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
       match req.dl.lst[0]:
         case '1':
@@ -46,7 +40,7 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
 
 def start_server():
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  print(f"Router service is listening on port {SERVER_ADDRESS[1]}")
+  print(f"Router's wait module is listening on port {SERVER_ADDRESS[1]}")
   sock.bind(SERVER_ADDRESS)
   sock.listen(5)
     
@@ -59,13 +53,25 @@ def start_server():
         data = client.conn.recv(4096)
         if data:
           req = gsm.Message(data, client.sv_bf_key)
-          print(req)
-          res = handle_req(client, req)
-          if res:
-            print(res)
-            client.conn.sendall(bytes(res))
-          elif req.header.type != gsm.MESSAGE_TYPE.STILLALIVE:
-            client.conn.sendall(data)
+          if req.header.size < len(data):
+            bundle = gsm.GSMessageBundle(req, data[req.header.size:], client)
+            print(bundle)
+            for msg in bundle.msgs:
+              print(msg)
+              res = handle_req(client, msg)
+              if res:
+                print(res)
+                client.conn.sendall(bytes(res))
+              elif req.header.type != gsm.MESSAGE_TYPE.STILLALIVE:
+                client.conn.sendall(data)
+          else:
+            print(req)
+            res = handle_req(client, req)
+            if res:
+              print(res)
+              client.conn.sendall(bytes(res))
+            elif req.header.type != gsm.MESSAGE_TYPE.STILLALIVE:
+              client.conn.sendall(data)
         else:
           print("No more data from", client.addr)
           break

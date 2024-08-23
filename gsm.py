@@ -3,7 +3,7 @@ import blowfish, gsxor, pkc, tcp, utils
 from data import List
 
 GSMSG_HEADER_SIZE = 6
-"""Length of GSMessage header in bytes."""
+"""Length of `GSMessageHeader` in bytes."""
 
 class MESSAGE_TYPE(Enum):
   """Type of `GSMessage` or its result."""
@@ -192,17 +192,32 @@ class Message:
     match self.header.property:
       case PROPERTY.GS:
         if self.header.size > GSMSG_HEADER_SIZE:
-          dec = gsxor.decrypt(bts[GSMSG_HEADER_SIZE:])
+          dec = gsxor.decrypt(bts[GSMSG_HEADER_SIZE:self.header.size])
           self.dl: List = List.from_buf(bytearray(dec))
       case PROPERTY.GAME:
         pass
       case PROPERTY.GS_ENCRYPT:
-        dec = blowfish.Cipher(bf_key).decrypt(bts[GSMSG_HEADER_SIZE:])
+        dec = blowfish.Cipher(bf_key).decrypt(bts[GSMSG_HEADER_SIZE:self.header.size])
         self.dl: List = List.from_buf(bytearray(dec))
 
   def __repr__(self):
     payload = self.dl or ""
     return f"<{self.header.type.name}\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}"
+
+class GSMessageBundle:
+  """Packet containing 2 or more GS messages."""
+  def __init__(self, first: Message, data: bytes, client: tcp.TcpClient):
+    self.msgs = [first]
+    while len(data) > 0:
+      msg = Message(bytes(data), client.sv_bf_key)
+      self.msgs.append(msg)
+      data = data[msg.header.size:]
+
+  def __repr__(self):
+    result = f"<BUNDLE: {self.msgs[0].header.type.name}"
+    for i in range(1, len(self.msgs), 1):
+      result += f" + {self.msgs[i].header.type.name}"
+    return result + ">"
 
 class GSMResponse:
   """Base class for GS message responses."""
@@ -270,4 +285,25 @@ class LoginResponse(GSMResponse):
     self.header.type = MESSAGE_TYPE.GSSUCCESS
     msg_id = MESSAGE_TYPE.LOGIN.value
     self.dl = List([msg_id.to_bytes(1, 'little')])
-    self.header.size = len(bytes(self.dl))
+
+class JoinWaitModuleResponse(GSMResponse):
+  """Response to `JOINWAITMODULE` messages."""
+  def __init__(self, req: Message, wait_module: tuple[str, int]):
+    if req.header.type != MESSAGE_TYPE.JOINWAITMODULE:
+      raise TypeError(f"JoinWaitModuleResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.GSSUCCESS
+    msg_id = MESSAGE_TYPE.JOINWAITMODULE.value
+    self.dl = List([msg_id.to_bytes(1, 'little'), [wait_module[0], utils.write_u32(wait_module[1])]])
+
+class LoginWaitModuleResponse(GSMResponse):
+  """Response to `LOGINWAITMODULE` messages."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOGINWAITMODULE:
+      raise TypeError(f"LoginWaitModuleResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.GSSUCCESS
+    msg_id = MESSAGE_TYPE.LOGINWAITMODULE.value
+    self.dl = List([msg_id.to_bytes(1, 'little')])
