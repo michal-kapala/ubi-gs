@@ -6,7 +6,7 @@ import gsxor
 
 class GSXORTests(unittest.TestCase):
   """Tests for GS XOR encryption algorithm."""
-  def test_gsxor(self):
+  def test_gsxor_payload(self):
     data = bytes([
       0x73, 0x31, 0x00, 0x5B, 0x73, 0x31, 0x00, 0x73, 0x32, 0x36, 0x30, 0x00, 0x62, 0x00, 0x00, 0x01,
       0x04, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -28,6 +28,12 @@ class GSXORTests(unittest.TestCase):
       0x00, 0x00, 0x00, 0x00, 0x03, 0x5D
     ])
     
+    enc = gsxor.encrypt(data)
+    dec = gsxor.decrypt(enc)
+    self.assertEqual(data, dec)
+
+  def test_gsxor_plaintext(self):
+    data = b'abcdefghijklmnopqASDASDrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     enc = gsxor.encrypt(data)
     dec = gsxor.decrypt(enc)
     self.assertEqual(data, dec)

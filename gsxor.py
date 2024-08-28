@@ -1,4 +1,4 @@
-import math
+import math, utils
 
 def encrypt(input: bytes):
   """GS XOR encryption algorithm."""
@@ -16,6 +16,7 @@ def encrypt(input: bytes):
   for i in range(new_size):
     buf[i] = 0xff
 
+  buf = utils.read_as_i16_list(bytes(buf))
   a = b = 0
   for i in range(size):
     if a < size_root:
@@ -32,7 +33,7 @@ def encrypt(input: bytes):
   idx = 0
   for j in range(size_root):
     for k in range(size_root):
-      if buf[k + size_root * j] != 0xff:
+      if buf[k + size_root * j] != -1:
         result[idx] = buf[k + size_root * j]
         idx += 1
 

@@ -1,6 +1,16 @@
+import array
+
 def write_u16(number: int):
   """Serializes 16-bit integer into a LE buffer."""
   return number.to_bytes(2, 'little')
+
+def read_as_i16_list(bts: bytes):
+  """Converts a LE buffer into a list of i16."""
+  if len(bts) % 2 != 0:
+    raise BufferError("Unpadded buffer cast to i16 list.")
+  arr = array.array('h')
+  arr.frombytes(bts)
+  return arr.tolist()
 
 def write_u24_be(number: int):
   """Serializes 24-bit integer into a LE buffer."""
@@ -9,9 +19,9 @@ def write_u24_be(number: int):
 def read_as_u32_list(bts: bytes):
   """Converts a LE buffer into a list of u32."""
   result: list[int] = []
-  if len(bts) % 4 != 0:
-    raise BufferError("Unpadded buffer cast to u32 list.")
   size = len(bts)
+  if size % 4 != 0:
+    raise BufferError("Unpadded buffer cast to u32 list.")
   for i in range(0, size, 4):
     nb = (bts[i] & 0xFF) + ((bts[i+1] << 8) & 0xff00) + ((bts[i+2] << 16) & 0xff0000) + ((bts[i+3] << 24) & 0xff000000)
     result.append(nb)
