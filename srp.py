@@ -147,8 +147,10 @@ class SRPSegment:
       for _ in range(half_len):
         check_base += struct.unpack_from('<H', data, trunc_pos)[0]
         trunc_pos += 2
-
-    checksum = (~(check_base + (check_base >> 16) + ((check_base + (check_base >> 16)) >> 16))) & 0xFFFF
+    checksum = check_base & 0xFFFF
+    checksum += check_base >> 16
+    checksum += checksum >> 16
+    checksum = ~checksum & 0xFFFF
     return write_u16(checksum)
   
 class SRPResponse:
