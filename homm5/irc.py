@@ -1,6 +1,11 @@
-import socket
+import socket, sys, os
+# relative module import stuff
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(root_dir)
+import ircm
 
 SERVER_ADDRESS = ('localhost', 7779)
+"""Address of the IRC service."""
 
 def start_server():
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -15,7 +20,8 @@ def start_server():
       # Receive the data in chunks and retransmit it
       while True:
         data = connection.recv(4096)
-        print(f"Received '{data.decode()}'")
+        req = ircm.IRCMessage(data)
+        print(req)
         if data:
           print("Sending data back to the client")
           connection.sendall(data)
