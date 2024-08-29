@@ -23,6 +23,7 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
       res = gsm.JoinWaitModuleResponse(req, WAIT_MODULE)
     case gsm.MESSAGE_TYPE.LOGIN:
       # todo: actual user auth here
+      client.username = req.dl.lst[0]
       res = gsm.LoginResponse(req)
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
       match req.dl.lst[0]:

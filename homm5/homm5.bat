@@ -17,4 +17,7 @@ echo.
 echo Starting Proxy...
 start "Heroes of Might and Magic V - Proxy" python proxy.py
 echo.
+echo Starting Proxy Wait Module...
+start "Heroes of Might and Magic V - Proxy (Wait Module)" python proxy_wm.py
+echo.
 exit

@@ -365,3 +365,14 @@ class ProxyJoinWaitModuleResponse(GSMResponse):
     self.header.type = MESSAGE_TYPE.GSSUCCESS
     msg_id = MESSAGE_TYPE.JOINWAITMODULE.value
     self.dl = List([msg_id.to_bytes(1, 'little'), [user, wait_module[0], str(wait_module[1])]])
+
+class ProxyLoginWaitModuleResponse(GSMResponse):
+  """Response to `LOGINWAITMODULE` messages for proxy WM."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOGINWAITMODULE:
+      raise TypeError(f"ProxyLoginWaitModuleResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.GSSUCCESS
+    msg_id = MESSAGE_TYPE.LOGINWAITMODULE.value
+    self.dl = List([msg_id.to_bytes(1, 'little'), []])

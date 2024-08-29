@@ -4,11 +4,8 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, pkc, tcp
 
-SERVER_ADDRESS = ('localhost', 7782)
-"""Address of the router's wait module service."""
-
-PROXY = ('localhost', 7783)
-"""Address of the proxy service the game will be redirected to."""
+SERVER_ADDRESS = ('localhost', 7784)
+"""Address of the proxy's wait module service."""
 
 CLIENTS: list[tcp.TcpClient] = []
 """Global list of connected game clients."""
@@ -17,15 +14,11 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
   """Handler for `gsm.Message` requests."""
   res = None
   match req.header.type:
-    case gsm.MESSAGE_TYPE.PLAYERINFO:
-      res = gsm.PlayerInfoResponse(req)
     case gsm.MESSAGE_TYPE.STILLALIVE:
       pass
     case gsm.MESSAGE_TYPE.LOGINWAITMODULE:
       client.username = req.dl.lst[0]
-      res = gsm.LoginWaitModuleResponse(req)
-    case gsm.MESSAGE_TYPE.PROXY_HANDLER:
-      res = gsm.ProxyHandlerResponse(req, PROXY)
+      res = gsm.ProxyLoginWaitModuleResponse(req)
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
       match req.dl.lst[0]:
         case '1':
@@ -48,7 +41,7 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
 
 def start_server():
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  print(f"Router's wait module is listening on port {SERVER_ADDRESS[1]}")
+  print(f"Proxy's wait module is listening on port {SERVER_ADDRESS[1]}")
   sock.bind(SERVER_ADDRESS)
   sock.listen(5)
     
