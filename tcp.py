@@ -10,3 +10,4 @@ class TcpClient:
     self.sv_privkey: rsa.PrivateKey = None
     self.game_bf_key: bytes = None
     self.sv_bf_key: bytes = None
+    self.username: str = None
