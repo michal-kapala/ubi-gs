@@ -152,6 +152,7 @@ class SENDER_RECEIVER(Enum):
   UNK = 8
   G = 9
   A = 10
+  PROXY = 11
 
 class PROPERTY(Enum):
   """Used implementation of the message."""

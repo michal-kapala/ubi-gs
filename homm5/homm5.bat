@@ -14,4 +14,7 @@ echo.
 echo Starting Router Wait Module...
 start "Heroes of Might and Magic V - Router (Wait Module)" python router_wm.py
 echo.
+echo Starting Proxy...
+start "Heroes of Might and Magic V - Proxy" python proxy.py
+echo.
 exit
