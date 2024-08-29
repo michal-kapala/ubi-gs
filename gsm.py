@@ -334,7 +334,7 @@ class ProxyHandlerResponse(GSMResponse):
     subtype = req.dl.lst[0]
     match subtype:
       case "1":
-        module_info = ["persistantdata", "69", "420"]
+        module_info = ["persistantdata", "0", "0"]
         proxy_info_key = "1"
         proxy_info = [[proxy_info_key, proxy_addr[0], str(proxy_addr[1])]]
         module_info.append(proxy_info)
@@ -343,3 +343,14 @@ class ProxyHandlerResponse(GSMResponse):
         self.dl = List([result, [subtype, ["1"]]])
       case _:
         raise BufferError(f"Unknown PROXY_HANDLER message subtype {subtype}")
+
+class ProxyLoginResponse(GSMResponse):
+  """Response to `LOGIN` messages for proxy service."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOGIN:
+      raise TypeError(f"ProxyLoginResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.GSSUCCESS
+    msg_id = MESSAGE_TYPE.LOGIN.value
+    self.dl = List([msg_id.to_bytes(1, 'little'), []])
