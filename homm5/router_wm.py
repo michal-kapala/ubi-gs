@@ -31,6 +31,17 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
         pass
       else:
         res = gsm.ProxyHandlerResponse(req, PROXY)
+    case gsm.MESSAGE_TYPE.LOBBY_MSG:
+      subtype = gsm.LOBBY_MSG(int(req.dl.lst[0]))
+      match subtype:
+        case gsm.LOBBY_MSG.LOGIN:
+          game_name = req.dl.lst[1][0]
+          res = gsm.LobbyMsgResponse(req)
+        case gsm.LOBBY_MSG.CHANGE_REQUESTED_LOBBIES:
+          game_name = req.dl.lst[1][0]
+          pass
+        case _:
+          raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
       match req.dl.lst[0]:
         case '1':

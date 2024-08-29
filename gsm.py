@@ -140,6 +140,52 @@ class MESSAGE_TYPE(Enum):
   KEY_EXCHANGE = 219
   REQUESTPORTID = 221
 
+class LOBBY_MSG(Enum):
+  """Type of `LOBBY_MSG` request."""
+  INFO_REFRESH = 6
+  GROUP_LEAVE = 8
+  GROUP_INFO_GET = 9
+  PLAYER_KICK = 10
+  CREATE_ROOM = 12
+  PARENT_GROUP_ID = 14
+  START_GAME = 15
+  START_MATCH = 17
+  LOBBY_DISCONNECTION = 18
+  LOGIN = 21
+  JOIN_LOBBY = 23
+  JOIN_ROOM = 24
+  MASTER_NEW = 27
+  SUBMIT_MATCH = 30
+  GROUP_CONFIG_UPDATE_RES = 31
+  UPDATE_PING = 32
+  GAME_READY = 33
+  PLAYER_BAN = 36
+  PLAYER_UNBAN = 40
+  UPDATE_GAME_INFO = 41
+  SET_PLAYER_INFO = 42
+  LOBBY_DISCONNECT_ALL = 43
+  MATCH_FINISH = 45
+  GET_ALT_GROUP_INFO = 46
+  MEMBER_JOIN = 50
+  MEMBER_LEAVE = 51
+  GROUP_INFO = 53
+  NEW_GROUP = 54
+  GROUP_REMOVE = 55
+  GAME_STARTED = 56
+  GROUP_CONFIG_UPDATE = 57
+  MASTER_CHANGED = 59
+  KICK_OUT = 61
+  MATCH_STARTED = 62
+  PLAYER_BANNED = 63
+  PLAYER_BANLIST = 64
+  MATCH_READY = 65
+  PLAYER_INFO_UPDATE = 66
+  PLAYER_UPDATE_STATUS = 69
+  FINAL_MATCH_RESULTS = 71
+  PLAYER_GROUP_GET = 106
+  CHANGE_REQUESTED_LOBBIES = 109
+  MEMBER_LIST = 151
+
 class SENDER_RECEIVER(Enum):
   """GSMessage sender/receiver types."""
   R = 1
@@ -390,3 +436,15 @@ class LoginFriendsResponse(GSMResponse):
     self.header.type = MESSAGE_TYPE.GSSUCCESS
     msg_id = MESSAGE_TYPE.LOGINFRIENDS.value
     self.dl = List([msg_id.to_bytes(1, 'little')])
+
+class LobbyMsgResponse(GSMResponse):
+  """Response to `LOBBY_MSG` messages."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"LobbyMsgResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = req.dl.lst[0]
+    self.dl = List([result, [subtype]])
