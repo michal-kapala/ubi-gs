@@ -13,11 +13,9 @@ print(f"GSNAT server is listening on port {SERVER_ADDRESS[1]}")
 while True:
   data, address = sock.recvfrom(1024)
   req = SRPRequest(data)
-  print(f"Received {req.segment.size} bytes from {address}")
+  print(req)
   # ConnectHost (SYN)
   if SRPHeaderFlags.SYN.name in req.segment.header.flags:
-    print(req)
     res = SRPResponse(req)
     sock.sendto(bytes(res), address)
-    print(f"Sent response to {address}:")
     print(res)

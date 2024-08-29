@@ -88,7 +88,16 @@ class SRPRequest:
     self.segment = SRPSegment(data)
 
   def __repr__(self):
-    return str(self.segment)
+    if SRPHeaderFlags.FIN.name in self.segment.header.flags:
+      return "<DISCONNECT>"
+    result = ""
+    for flag in self.segment.header.flags:
+      if flag != SRPHeaderFlags.SRP_ID.name:
+        if len(result) > 0:
+          result += f'+{flag}'
+        else:
+          result += f'{flag}'
+    return f'<REQ: {result}>'
 
 class SRPSegment:
   """SRP packet."""
@@ -147,6 +156,7 @@ class SRPSegment:
       for _ in range(half_len):
         check_base += struct.unpack_from('<H', data, trunc_pos)[0]
         trunc_pos += 2
+        
     checksum = check_base & 0xFFFF
     checksum += check_base >> 16
     checksum += checksum >> 16
@@ -159,7 +169,14 @@ class SRPResponse:
     self.segment = SRPSegment.from_req(req)
 
   def __repr__(self):
-    return str(self.segment)
+    result = ""
+    for flag in self.segment.header.flags:
+      if flag != SRPHeaderFlags.SRP_ID.name:
+        if len(result) > 0:
+          result += f'+{flag}'
+        else:
+          result += f'{flag}'
+    return f'<RES: {result}>'
 
   def __bytes__(self):
     return bytes(self.segment)
