@@ -96,7 +96,7 @@ class SRPRequest:
         if len(result) > 0:
           result += f'+{flag}'
         else:
-          result += f'{flag}'
+          result += flag
     return f'<REQ: {result}>'
 
 class SRPSegment:

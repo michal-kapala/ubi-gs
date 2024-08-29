@@ -320,3 +320,25 @@ class PlayerInfoResponse(GSMResponse):
     msg_id = MESSAGE_TYPE.PLAYERINFO.value
     player_data = ['findme1', 'findme2', 'findme3', 'findme4', 'findme5', 'findme6', 'findme7']
     self.dl = List([msg_id.to_bytes(1, 'little'), player_data])
+
+class ProxyHandlerResponse(GSMResponse):
+  """Response to `PROXY_HANDLER` messages."""
+  def __init__(self, req: Message, proxy_addr: tuple[str, int]):
+    if req.header.type != MESSAGE_TYPE.PROXY_HANDLER:
+      raise TypeError(f"ProxyHandlerResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.PROXY_HANDLER
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = req.dl.lst[0]
+    match subtype:
+      case "1":
+        module_info = ["persistantdata", "69", "420"]
+        proxy_info_key = "1"
+        proxy_info = [[proxy_info_key, proxy_addr[0], str(proxy_addr[1])]]
+        module_info.append(proxy_info)
+        self.dl = List([result, [subtype, module_info]])
+      case "2":
+        self.dl = List([result, [subtype, ["1"]]])
+      case _:
+        raise BufferError(f"Unknown PROXY_HANDLER message subtype {subtype}")

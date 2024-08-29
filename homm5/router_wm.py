@@ -7,6 +7,9 @@ import gsm, pkc, tcp
 SERVER_ADDRESS = ('localhost', 7782)
 """Address of the router's wait module service."""
 
+PROXY = ('localhost', 7783)
+"""Address of the proxy service the game will be redirected to."""
+
 CLIENTS: list[tcp.TcpClient] = []
 """Global list of connected game clients."""
 
@@ -20,6 +23,8 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
       pass
     case gsm.MESSAGE_TYPE.LOGINWAITMODULE:
       res = gsm.LoginWaitModuleResponse(req)
+    case gsm.MESSAGE_TYPE.PROXY_HANDLER:
+      res = gsm.ProxyHandlerResponse(req, PROXY)
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
       match req.dl.lst[0]:
         case '1':
