@@ -24,6 +24,8 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
     case gsm.MESSAGE_TYPE.LOGINWAITMODULE:
       client.username = req.dl.lst[0]
       res = gsm.LoginWaitModuleResponse(req)
+    case gsm.MESSAGE_TYPE.LOGINFRIENDS:
+      res = gsm.LoginFriendsResponse(req)
     case gsm.MESSAGE_TYPE.PROXY_HANDLER:
       if str(type(req.dl.lst[0])) == "<class 'list'>":
         pass
