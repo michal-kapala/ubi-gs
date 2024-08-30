@@ -18,7 +18,7 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
   res = None
   match req.header.type:
     case gsm.MESSAGE_TYPE.PLAYERINFO:
-      res = gsm.PlayerInfoResponse(req)
+      res = gsm.PlayerInfoResponse(req, client.username)
     case gsm.MESSAGE_TYPE.STILLALIVE:
       pass
     case gsm.MESSAGE_TYPE.LOGINWAITMODULE:

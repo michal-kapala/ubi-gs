@@ -358,14 +358,15 @@ class LoginWaitModuleResponse(GSMResponse):
 
 class PlayerInfoResponse(GSMResponse):
   """Response to `PLAYERINFO` messages."""
-  def __init__(self, req: Message):
+  def __init__(self, req: Message, user: str):
     if req.header.type != MESSAGE_TYPE.PLAYERINFO:
       raise TypeError(f"PlayerInfoResponse constructed from {req.header.type} request.")
     super().__init__(req)
     self.header.property = PROPERTY.GS
     self.header.type = MESSAGE_TYPE.GSSUCCESS
     msg_id = MESSAGE_TYPE.PLAYERINFO.value
-    player_data = ['findme1', 'findme2', 'findme3', 'findme4', 'findme5', 'findme6', 'findme7']
+    nick = real_name = user
+    player_data = [nick, real_name, 'findme3', 'findme4', 'findme5', 'findme6', 'findme7']
     self.dl = List([msg_id.to_bytes(1, 'little'), player_data])
 
 class ProxyHandlerResponse(GSMResponse):

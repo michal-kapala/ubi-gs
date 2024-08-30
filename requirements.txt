@@ -1,0 +1,4 @@
+Flask==2.2.3
+irc==20.5.0
+jaraco.util==15.0.0
+rsa==4.9

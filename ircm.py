@@ -13,10 +13,27 @@ IRCM_HEADER_SIZE = 2
 """Length of `IRCMessage` header in bytes."""
 
 class IRCMessage:
-  """IRC message."""
-  def __init__(self, bts: bytes):
-    self.size = utils.read_u16_be(bts[:IRCM_HEADER_SIZE])
-    self.payload = BLOWFISH.decrypt(bts[IRCM_HEADER_SIZE:])
+  """GS implementation of IRC message."""
+  def __init__(self, bts = bytes()):
+    if len(bts) > 0:
+      self.size = utils.read_u16_be(bts[:IRCM_HEADER_SIZE])
+      self.payload = BLOWFISH.decrypt(bts[IRCM_HEADER_SIZE:])
 
-  def __repr__(self) -> str:
-    return self.payload.hex(' ')
+  def __repr__(self):
+    return self.payload.decode()
+
+  def __bytes__(self):
+    """Encrypts and serializes the message to buffer."""
+    payload = BLOWFISH.encrypt(self.payload)
+    size = len(payload) + IRCM_HEADER_SIZE
+    result = bytearray(utils.write_u16_be(size))
+    result.extend(payload)
+    return bytes(result)
+
+  def from_str(text: str):
+    """Creates an instance from plaintext."""
+    msg = IRCMessage()
+    msg.payload = text.encode()
+    msg.size = len(msg.payload) + IRCM_HEADER_SIZE
+    return msg
+

@@ -4,6 +4,10 @@ def read_u16_be(bts: bytes):
   """Reads a big endian u16."""
   return (bts[0] << 8) + bts[1]
 
+def write_u16_be(number: int):
+  """Serializes 16-bit integer into a BE buffer."""
+  return number.to_bytes(2, 'big')
+
 def write_u16(number: int):
   """Serializes 16-bit integer into a LE buffer."""
   return number.to_bytes(2, 'little')
