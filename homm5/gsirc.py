@@ -380,6 +380,20 @@ class IRCClient(socketserver.BaseRequestHandler):
     response += ' '.join(nickOnline)
     return response
 
+  def handle_mode(self, params: str):
+    """Handle `MODE` command which queries/sets the visibility of a user/channel."""
+    target, mode = params.split(' ', 1)
+    if mode[0] == ":":
+      mode = mode[1:]
+    self.mode = mode
+    # channel mode
+    if target[0] in ['#', '&']:
+      pass
+    # user mode
+    else:
+      response = f':{self.server.servername} MODE {target} {mode}'
+      return response
+
   def client_ident(self):
     """Return the client identifier as included in many command replies."""
     return NickMask.from_params(
