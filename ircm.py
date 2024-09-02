@@ -17,7 +17,7 @@ class IRCMessage:
   def __init__(self, bts = bytes()):
     if len(bts) > 0:
       self.size = utils.read_u16_be(bts[:IRCM_HEADER_SIZE])
-      self.payload = BLOWFISH.decrypt(bts[IRCM_HEADER_SIZE:])
+      self.payload = BLOWFISH.decrypt(bts[IRCM_HEADER_SIZE:IRCM_HEADER_SIZE + self.size])
 
   def __repr__(self):
     return self.payload.decode()
@@ -25,7 +25,7 @@ class IRCMessage:
   def __bytes__(self):
     """Encrypts and serializes the message to buffer."""
     payload = BLOWFISH.encrypt(self.payload)
-    size = len(payload) + IRCM_HEADER_SIZE
+    size = len(payload)
     result = bytearray(utils.write_u16_be(size))
     result.extend(payload)
     return bytes(result)
@@ -34,6 +34,21 @@ class IRCMessage:
     """Creates an instance from plaintext."""
     msg = IRCMessage()
     msg.payload = text.encode()
-    msg.size = len(msg.payload) + IRCM_HEADER_SIZE
+    msg.size = len(msg.payload)
     return msg
 
+
+class IRCMessageBundle:
+  """Packet containing 2 or more IRC messages."""
+  def __init__(self, first: IRCMessage, data: bytes):
+    self.msgs = [first]
+    while len(data) > 0:
+      msg = IRCMessage(bytes(data))
+      self.msgs.append(msg)
+      data = data[IRCM_HEADER_SIZE + msg.size:]
+
+  def __repr__(self):
+    result = f"<BUNDLE:\n"
+    for msg in self.msgs:
+      result += f'{msg}'
+    return result + ">"

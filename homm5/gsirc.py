@@ -93,22 +93,32 @@ class IRCClient(socketserver.BaseRequestHandler):
 
   def _handle_incoming(self):
     try:
-      data = self.request.recv(1024)
+      data: bytes = self.request.recv(1024)
     except Exception as err:
       raise self.Disconnect() from err
 
     if not data:
       raise self.Disconnect()
-    
-    if len(data) > ircm.IRCM_HEADER_SIZE:
+    size = len(data)
+    if size > ircm.IRCM_HEADER_SIZE:
       # decryption
       msg = ircm.IRCMessage(data)
-      data = msg.payload
-      self.buffer.feed(data)
-      for line in self.buffer:
-        line = line.decode('utf-8')
-        print(f'req: {line}')
-        self._handle_line(line)
+      # bundled
+      if size > ircm.IRCM_HEADER_SIZE + msg.size:
+        bundle = ircm.IRCMessageBundle(msg, data[ircm.IRCM_HEADER_SIZE + msg.size:])
+        print(bundle)
+        for m in bundle.msgs:
+          self._handle_lines(m)
+      # single message
+      else:
+        self._handle_lines(msg)
+
+  def _handle_lines(self, msg: ircm.IRCMessage):
+    self.buffer.feed(msg.payload)
+    for line in self.buffer:
+      line = line.decode('utf-8')
+      print(f'req: {line}')
+      self._handle_line(line)
 
   def _handle_line(self, line: str):
     response = None
