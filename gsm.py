@@ -1,6 +1,7 @@
 from enum import Enum
 import blowfish, gsxor, pkc, tcp, utils
 from data import List
+from group import Lobby, GAME_MODE
 
 GSMSG_HEADER_SIZE = 6
 """Length of `GSMessageHeader` in bytes."""
@@ -142,6 +143,7 @@ class MESSAGE_TYPE(Enum):
 
 class LOBBY_MSG(Enum):
   """Type of `LOBBY_MSG` request."""
+  JOIN_SERVER = 3
   INFO_REFRESH = 6
   GROUP_LEAVE = 8
   GROUP_INFO_GET = 9
@@ -151,6 +153,7 @@ class LOBBY_MSG(Enum):
   START_GAME = 15
   START_MATCH = 17
   LOBBY_DISCONNECTION = 18
+  REMOVE_SERVER = 19
   LOGIN = 21
   JOIN_LOBBY = 23
   JOIN_ROOM = 24
@@ -440,12 +443,32 @@ class LoginFriendsResponse(GSMResponse):
 
 class LobbyMsgResponse(GSMResponse):
   """Response to `LOBBY_MSG` messages."""
-  def __init__(self, req: Message):
+  def __init__(self, req: Message, lobby_server: tuple[str, int]):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
       raise TypeError(f"LobbyMsgResponse constructed from {req.header.type} request.")
     super().__init__(req)
     self.header.property = PROPERTY.GS
     self.header.type = MESSAGE_TYPE.LOBBY_MSG
-    result = str(MESSAGE_TYPE.GSSUCCESS.value)
-    subtype = req.dl.lst[0]
-    self.dl = List([result, [subtype]])
+    subtype = LOBBY_MSG(int(req.dl.lst[0]))
+    match subtype:
+      case LOBBY_MSG.LOGIN:
+        subtype = str(subtype.value)
+        result = str(MESSAGE_TYPE.GSSUCCESS.value)
+        self.dl = List([result, [subtype]])
+      case _:
+        raise NotImplementedError(f"Unsupported lobby message subtype {subtype.name}")
+
+class GroupInfoResponse(GSMResponse):
+  """Response to `LOBBY_MSG.CHANGE_REQUESTED_LOBBIES` messages."""
+  def __init__(self, req: Message, client: tcp.TcpClient):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"InfoRefreshResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    msg_id = str(LOBBY_MSG.GROUP_INFO.value)
+    group_id = "1"
+    flag = str(0x100)
+    is_rooms = "0"
+    lobby = Lobby("Heroes V in 2024?!?", client.username, GAME_MODE.STANDARD)
+    self.dl = List([msg_id, [group_id, flag, [is_rooms], [lobby.to_list()]]])

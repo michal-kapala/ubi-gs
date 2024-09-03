@@ -16,7 +16,7 @@ class Data(ABC):
     self.type = type
 
   @abstractmethod
-  def __str__(self):
+  def __str__(self) -> str:
     pass
 
   @abstractmethod

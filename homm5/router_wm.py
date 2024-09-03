@@ -10,6 +10,9 @@ SERVER_ADDRESS = ('localhost', 7782)
 PROXY = ('localhost', 7783)
 """Address of the proxy service the game will be redirected to."""
 
+LOBBY_SERVER = ('localhost', 7785)
+"""Address of the lobby service the game will be redirected to."""
+
 CLIENTS: list[tcp.TcpClient] = []
 """Global list of connected game clients."""
 
@@ -36,10 +39,10 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
       match subtype:
         case gsm.LOBBY_MSG.LOGIN:
           game_name = req.dl.lst[1][0]
-          res = gsm.LobbyMsgResponse(req)
+          res = gsm.LobbyMsgResponse(req, LOBBY_SERVER)
         case gsm.LOBBY_MSG.CHANGE_REQUESTED_LOBBIES:
           game_name = req.dl.lst[1][0]
-          pass
+          res = gsm.GroupInfoResponse(req, client)
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
