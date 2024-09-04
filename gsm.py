@@ -443,7 +443,7 @@ class LoginFriendsResponse(GSMResponse):
 
 class LobbyMsgResponse(GSMResponse):
   """Response to `LOBBY_MSG` messages."""
-  def __init__(self, req: Message, lobby_server: tuple[str, int]):
+  def __init__(self, req: Message):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
       raise TypeError(f"LobbyMsgResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -487,3 +487,30 @@ class JoinLobbyServerResponse(GSMResponse):
     ip = lobby_sv[0]
     port = str(lobby_sv[1])
     self.dl = List([result, [subtype, [server_id, ip, port]]])
+
+class LobbyServerLoginResponse(GSMResponse):
+  """Response to `LOBBYSERVERLOGIN` messages."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOBBYSERVERLOGIN:
+      raise TypeError(f"LobbyServerLoginResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.GSSUCCESS
+    result = str(MESSAGE_TYPE.LOBBYSERVERLOGIN.value)
+    server_id = req.dl.lst[1]
+    self.dl = List([result, [server_id]])
+
+class JoinLobbyResponse(GSMResponse):
+  """Response to `LOBBY_MSG.JOIN_LOBBY` messages."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"JoinLobbyResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = str(LOBBY_MSG.JOIN_LOBBY.value)
+    group_id = req.dl.lst[1][0]
+    # reason goes after group_id, for failures only
+    reason = str("")
+    self.dl = List([result, [subtype, [group_id]]])

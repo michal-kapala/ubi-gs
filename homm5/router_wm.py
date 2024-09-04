@@ -41,7 +41,7 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
           res = gsm.JoinLobbyServerResponse(req, LOBBY_SERVER)
         case gsm.LOBBY_MSG.LOGIN:
           game_name = req.dl.lst[1][0]
-          res = gsm.LobbyMsgResponse(req, LOBBY_SERVER)
+          res = gsm.LobbyMsgResponse(req)
         case gsm.LOBBY_MSG.CHANGE_REQUESTED_LOBBIES:
           game_name = req.dl.lst[1][0]
           res = gsm.GroupInfoResponse(req, client)
