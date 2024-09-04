@@ -20,4 +20,7 @@ echo.
 echo Starting Proxy Wait Module...
 start "Heroes of Might and Magic V - Proxy (Wait Module)" python proxy_wm.py
 echo.
+echo Starting Lobby...
+start "Heroes of Might and Magic V - Lobby" python lobby.py
+echo.
 exit

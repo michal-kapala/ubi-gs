@@ -37,6 +37,8 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
     case gsm.MESSAGE_TYPE.LOBBY_MSG:
       subtype = gsm.LOBBY_MSG(int(req.dl.lst[0]))
       match subtype:
+        case gsm.LOBBY_MSG.JOIN_SERVER:
+          res = gsm.JoinLobbyServerResponse(req, LOBBY_SERVER)
         case gsm.LOBBY_MSG.LOGIN:
           game_name = req.dl.lst[1][0]
           res = gsm.LobbyMsgResponse(req, LOBBY_SERVER)

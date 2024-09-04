@@ -472,3 +472,18 @@ class GroupInfoResponse(GSMResponse):
     is_rooms = "0"
     lobby = Lobby("Heroes V in 2024?!?", client.username, GAME_MODE.STANDARD)
     self.dl = List([msg_id, [group_id, flag, [is_rooms], [lobby.to_list()]]])
+
+class JoinLobbyServerResponse(GSMResponse):
+  """Response to `LOBBY_MSG.JOIN_SERVER` messages."""
+  def __init__(self, req: Message, lobby_sv: tuple[str, int]):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"JoinLobbyServerResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = str(LOBBY_MSG.JOIN_SERVER.value)
+    server_id = req.dl.lst[1][0]
+    ip = lobby_sv[0]
+    port = str(lobby_sv[1])
+    self.dl = List([result, [subtype, [server_id, ip, port]]])
