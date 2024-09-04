@@ -2,7 +2,7 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import gsm, pkc, tcp
+import gsm, pkc, client
 
 SERVER_ADDRESS = ('localhost', 7777)
 """Address of the router service."""
@@ -10,10 +10,10 @@ SERVER_ADDRESS = ('localhost', 7777)
 WAIT_MODULE = ("127.0.0.1", 7782)
 """Address of the wait module service the game will be redirected to."""
 
-CLIENTS: list[tcp.TcpClient] = []
+CLIENTS: list[client.TcpClient] = []
 """Global list of connected game clients."""
 
-def handle_req(client: tcp.TcpClient, req: gsm.Message):
+def handle_req(clt: client.TcpClient, req: gsm.Message):
   """Handler for `gsm.Message` requests."""
   res = None
   match req.header.type:
@@ -23,22 +23,22 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
       res = gsm.JoinWaitModuleResponse(req, WAIT_MODULE)
     case gsm.MESSAGE_TYPE.LOGIN:
       # todo: actual user auth here
-      client.username = req.dl.lst[0]
+      clt.username = req.dl.lst[0]
       res = gsm.LoginResponse(req)
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:
       match req.dl.lst[0]:
         case '1':
-          client.game_pubkey = pkc.RsaPublicKey.from_buf(req.dl.lst[1][2]).to_pubkey()
+          clt.game_pubkey = pkc.RsaPublicKey.from_buf(req.dl.lst[1][2]).to_pubkey()
           # keygen
           pub_key, priv_key = pkc.keygen()
-          client.sv_pubkey = pub_key
-          client.sv_privkey = priv_key
-          res = gsm.KeyExchangeResponse(req, client)
+          clt.sv_pubkey = pub_key
+          clt.sv_privkey = priv_key
+          res = gsm.KeyExchangeResponse(req, clt)
         case '2':
           enc_bf_key = bytes(req.dl.lst[1][2])
-          bf_key = pkc.decrypt(enc_bf_key, client.sv_privkey)
-          client.game_bf_key = bf_key
-          res = gsm.KeyExchangeResponse(req, client)
+          bf_key = pkc.decrypt(enc_bf_key, clt.sv_privkey)
+          clt.game_bf_key = bf_key
+          res = gsm.KeyExchangeResponse(req, clt)
         case _:
           raise BufferError(f'Unknown reqId ({req.dl[0]}) for a {req.header.type.name} message.')
     case _:
@@ -52,27 +52,27 @@ def start_server():
   sock.listen(5)
     
   while True:
-    client = tcp.TcpClient(sock.accept())
-    CLIENTS.append(client)
-    print(f"Connection from {client.addr}")
+    clt = client.TcpClient(sock.accept())
+    CLIENTS.append(clt)
+    print(f"Connection from {clt.addr}")
     try:
       while True:
-        data = client.conn.recv(4096)
+        data = clt.conn.recv(4096)
         if data:
-          req = gsm.Message(data, client.sv_bf_key)
+          req = gsm.Message(data, clt.sv_bf_key)
           print(req)
-          res = handle_req(client, req)
+          res = handle_req(clt, req)
           if res:
             print(res)
-            client.conn.sendall(bytes(res))
+            clt.conn.sendall(bytes(res))
           elif req.header.type != gsm.MESSAGE_TYPE.STILLALIVE:
-            client.conn.sendall(data)
+            clt.conn.sendall(data)
         else:
-          print("No more data from", client.addr)
+          print("No more data from", clt.addr)
           break
     finally:
-      client.conn.close()
-      CLIENTS.remove(client)
+      clt.conn.close()
+      CLIENTS.remove(clt)
 
 if __name__ == "__main__":
     start_server()

@@ -1,5 +1,5 @@
 from enum import Enum
-import blowfish, gsxor, pkc, tcp, utils
+import blowfish, gsxor, pkc, client, utils
 from data import List
 from group import Lobby, GAME_MODE
 
@@ -139,7 +139,7 @@ class MESSAGE_TYPE(Enum):
   SETGROUPSZDATA = 211
   GROUPSZDATA = 212
   KEY_EXCHANGE = 219
-  REQUESTPORTID = 221
+  NAT = 221
 
 class LOBBY_MSG(Enum):
   """Type of `LOBBY_MSG` request."""
@@ -188,6 +188,11 @@ class LOBBY_MSG(Enum):
   PLAYER_GROUP_GET = 106
   CHANGE_REQUESTED_LOBBIES = 109
   MEMBER_LIST = 151
+
+class NAT_MSG(Enum):
+  """Subtype of `MESSAGE_TYPE.NAT`."""
+  PORT_ID = 2
+  ADDRESS = 3
 
 class SENDER_RECEIVER(Enum):
   """GSMessage sender/receiver types."""
@@ -257,10 +262,10 @@ class Message:
 
 class GSMessageBundle:
   """Packet containing 2 or more GS messages."""
-  def __init__(self, first: Message, data: bytes, client: tcp.TcpClient):
+  def __init__(self, first: Message, data: bytes, clt: client.TcpClient):
     self.msgs = [first]
     while len(data) > 0:
-      msg = Message(bytes(data), client.sv_bf_key)
+      msg = Message(bytes(data), clt.sv_bf_key)
       self.msgs.append(msg)
       data = data[msg.header.size:]
 
@@ -302,7 +307,7 @@ class GSMResponse:
 
 class KeyExchangeResponse(GSMResponse):
   """Response to `KEY_EXCHANGE` messages."""
-  def __init__(self, req: Message, client: tcp.TcpClient):
+  def __init__(self, req: Message, clt: client.TcpClient):
     if req.header.type != MESSAGE_TYPE.KEY_EXCHANGE:
       raise TypeError(f"KeyExchangeResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -310,15 +315,15 @@ class KeyExchangeResponse(GSMResponse):
     match req_id:
       case 1:
         self.dl = List(['1', ['1']])
-        pub_key: pkc.RsaPublicKey = pkc.RsaPublicKey.from_pubkey(client.sv_pubkey)
+        pub_key: pkc.RsaPublicKey = pkc.RsaPublicKey.from_pubkey(clt.sv_pubkey)
         buf = bytes(pub_key)
         self.dl.lst[1].append(str(len(buf)))
         self.dl.lst[1].append(buf)
       case 2:
         self.dl = List(['2', ['1']])
         bf_key = blowfish.Cipher.keygen(16)
-        client.sv_bf_key = bf_key
-        enc_key = pkc.encrypt(bf_key, client.game_pubkey)
+        clt.sv_bf_key = bf_key
+        enc_key = pkc.encrypt(bf_key, clt.game_pubkey)
         self.dl.lst[1].append(str(len(enc_key)))
         self.dl.lst[1].append(enc_key)
       case 3:
@@ -460,7 +465,7 @@ class LobbyMsgResponse(GSMResponse):
 
 class GroupInfoResponse(GSMResponse):
   """Response to `LOBBY_MSG.CHANGE_REQUESTED_LOBBIES` messages."""
-  def __init__(self, req: Message, client: tcp.TcpClient):
+  def __init__(self, req: Message, clt: client.TcpClient):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
       raise TypeError(f"InfoRefreshResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -470,7 +475,7 @@ class GroupInfoResponse(GSMResponse):
     group_id = "1"
     flag = str(0x100)
     is_rooms = "0"
-    lobby = Lobby("Heroes V in 2024?!?", client.username, GAME_MODE.STANDARD)
+    lobby = Lobby("Heroes V in 2024?!?", clt.username, GAME_MODE.STANDARD)
     self.dl = List([msg_id, [group_id, flag, [is_rooms], [lobby.to_list()]]])
 
 class JoinLobbyServerResponse(GSMResponse):
@@ -512,5 +517,18 @@ class JoinLobbyResponse(GSMResponse):
     subtype = str(LOBBY_MSG.JOIN_LOBBY.value)
     group_id = req.dl.lst[1][0]
     # reason goes after group_id, for failures only
-    reason = str("")
+    reason = ""
     self.dl = List([result, [subtype, [group_id]]])
+
+class NatResponse(GSMResponse):
+  """Response to `NAT` messages."""
+  def __init__(self, req: Message, subtype: NAT_MSG, clt: client.UdpClient):
+    if req.header.type != MESSAGE_TYPE.NAT:
+      raise TypeError(f"NatResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.NAT
+    socketId = req.dl.lst[1][0]
+    ip = str(utils.ipv4_to_u32(clt.addr))
+    port = str(clt.port)
+    self.dl = List([str(subtype.value), [socketId, ip, port]])

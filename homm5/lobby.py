@@ -2,22 +2,22 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import gsm, tcp
+import gsm, client
 
 SERVER_ADDRESS = ('localhost', 7785)
 """Address of the lobby service."""
 
-CLIENTS: list[tcp.TcpClient] = []
+CLIENTS: list[client.TcpClient] = []
 """Global list of connected game clients."""
 
-def handle_req(client: tcp.TcpClient, req: gsm.Message):
+def handle_req(clt: client.TcpClient, req: gsm.Message):
   """Handler for `gsm.Message` requests."""
   res = None
   match req.header.type:
     case gsm.MESSAGE_TYPE.STILLALIVE:
       pass
     case gsm.MESSAGE_TYPE.LOGINWAITMODULE:
-      client.username = req.dl.lst[0]
+      clt.username = req.dl.lst[0]
       res = gsm.LoginWaitModuleResponse(req)
     case gsm.MESSAGE_TYPE.LOBBYSERVERLOGIN:
       res = gsm.LobbyServerLoginResponse(req)
@@ -33,7 +33,7 @@ def handle_req(client: tcp.TcpClient, req: gsm.Message):
           res = gsm.JoinLobbyResponse(req)
         case gsm.LOBBY_MSG.CHANGE_REQUESTED_LOBBIES:
           game_name = req.dl.lst[1][0]
-          res = gsm.GroupInfoResponse(req, client)
+          res = gsm.GroupInfoResponse(req, clt)
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case _:
@@ -47,39 +47,39 @@ def start_server():
   sock.listen(5)
     
   while True:
-    client = tcp.TcpClient(sock.accept())
-    CLIENTS.append(client)
-    print(f"Connection from {client.addr}")
+    clt = client.TcpClient(sock.accept())
+    CLIENTS.append(clt)
+    print(f"Connection from {clt.addr}")
     try:
       while True:
-        data = client.conn.recv(4096)
+        data = clt.conn.recv(4096)
         if data:
-          req = gsm.Message(data, client.sv_bf_key)
+          req = gsm.Message(data, clt.sv_bf_key)
           if req.header.size < len(data):
-            bundle = gsm.GSMessageBundle(req, data[req.header.size:], client)
+            bundle = gsm.GSMessageBundle(req, data[req.header.size:], clt)
             print(bundle)
             for msg in bundle.msgs:
               print(msg)
-              res = handle_req(client, msg)
+              res = handle_req(clt, msg)
               if res:
                 print(res)
-                client.conn.sendall(bytes(res))
+                clt.conn.sendall(bytes(res))
               elif req.header.type != gsm.MESSAGE_TYPE.STILLALIVE:
-                client.conn.sendall(data)
+                clt.conn.sendall(data)
           else:
             print(req)
-            res = handle_req(client, req)
+            res = handle_req(clt, req)
             if res:
               print(res)
-              client.conn.sendall(bytes(res))
+              clt.conn.sendall(bytes(res))
             elif req.header.type != gsm.MESSAGE_TYPE.STILLALIVE:
-              client.conn.sendall(data)
+              clt.conn.sendall(data)
         else:
-          print("No more data from", client.addr)
+          print("No more data from", clt.addr)
           break
     finally:
-      client.conn.close()
-      CLIENTS.remove(client)
+      clt.conn.close()
+      CLIENTS.remove(clt)
 
 if __name__ == "__main__":
     start_server()

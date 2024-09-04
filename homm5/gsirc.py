@@ -232,14 +232,17 @@ class IRCClient(socketserver.BaseRequestHandler):
   def handle_join(self, params: str):
     """
     Handle the JOINing of a user to a channel. Valid channel names start
-    with a # and consist of a-z, A-Z, 0-9 and/or '_'.
+    with a # and consist of a-z, A-Z, 0-9 and/or '_' (extended with dot).
     """
     channel_names = params.split(' ', 1)[0]  # Ignore keys
     for channel_name in channel_names.split(','):
       r_channel_name = channel_name.strip()
+      
+      if r_channel_name[0] == ':':
+        r_channel_name = r_channel_name[1:]
 
       # Valid channel name?
-      if not re.match('^#([a-zA-Z0-9_])+$', r_channel_name):
+      if not re.match('^#([a-zA-Z0-9_\.])+$', r_channel_name):
         raise IRCError.from_name(
           'nosuchchannel', f'{r_channel_name} :No such channel'
         )

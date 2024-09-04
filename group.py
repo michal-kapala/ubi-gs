@@ -18,7 +18,7 @@ class Group(ABC):
   def __init__(self, name: str, master: str, game_mode: GAME_MODE):
     self.group_type = GROUP_TYPE.LOBBY.value
     self.group_name = name
-    self.group_id = 13
+    self.group_id = 1
     self.lobby_sv_id = 1
     self.parent_id = 0
     self.config = 0

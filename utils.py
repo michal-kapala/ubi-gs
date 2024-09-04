@@ -1,4 +1,4 @@
-import array
+import array, socket
 
 def read_u16_be(bts: bytes):
   """Reads a big endian u16."""
@@ -76,3 +76,8 @@ def read_bigint_be(bts: bytes, size: int):
 def write_bigint_be(bigint: int, size: int):
   """Writes an arbitrarily large big-endian uint to the buffer."""
   return bigint.to_bytes(size, 'big')
+
+def ipv4_to_u32(ip: str):
+  """Converts IPv4 address into integer representation."""
+  result = socket.inet_aton(ip)
+  return read_u32(result)

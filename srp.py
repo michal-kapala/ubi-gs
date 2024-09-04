@@ -1,6 +1,7 @@
-import struct
+import struct, typing
 from enum import Enum
 from utils import write_u16
+import gsm, client
 
 SRP_HEADER_SIZE = 12
 """Length of SRP header in bytes."""
@@ -97,51 +98,109 @@ class SRPRequest:
           result += f'+{flag}'
         else:
           result += flag
-    return f'<REQ: {result}>'
+    msg = self.segment.msg if self.segment.msg else ""
+    if msg != "":
+      msg = f'\n{msg}'
+    return f'<REQ: {result if result != "" else "MSG"}>{msg}'
 
 class SRPSegment:
   """SRP packet."""
   def __init__(self, data: bytes):
     self.size = len(data)
     self.header = SRPHeader(data[:SRP_HEADER_SIZE])
+    self.window = None
+    self.msg = None
     if len(data) > SRP_HEADER_SIZE:
-      self.window = SRPWindow(data[SRP_HEADER_SIZE:])
+      data = data[SRP_HEADER_SIZE:SRP_HEADER_SIZE + self.header.data_size]
+      if len(data) == SRP_WINDOW_SIZE:
+        self.window = SRPWindow(data)
+      else:
+        self.msg = gsm.Message(data, b'')
 
   def __repr__(self):
     result = str(self.header)
-    if self.size > SRP_HEADER_SIZE:
+    if self.window is not None:
       result += str(self.window)
+    if self.msg is not None:
+      result += str(self.msg)
     return result
   
   def __bytes__(self):
     result = bytearray(bytes(self.header))
     if self.size > SRP_HEADER_SIZE:
-      result.extend(bytes(self.window))
+      if self.size > SRP_HEADER_SIZE + SRP_WINDOW_SIZE:
+        result.extend(bytes(self.msg))
+      else:
+        result.extend(bytes(self.window))
     return bytes(result)
   
-  def from_req(req: SRPRequest):
-    # header
-    checksum = write_u16(req.segment.window.checksum_init_val)
-    signature = bytes([(req.segment.window.sender_sig & 0xff), (req.segment.window.sender_sig >> 8)])
-    data_size = bytes([SRP_WINDOW_SIZE, 0x00])
-    flags = write_u16(SRPHeaderFlags.SRP_ID.value | SRPHeaderFlags.SYN.value | SRPHeaderFlags.ACK.value)
+class SRPResponse:
+  """SRP response."""
+  def __init__(self, req: SRPRequest, clt: client.NatClient):
+    # save window data on SYN
+    if req.segment.window is not None:
+      clt.checksum_init = req.segment.window.checksum_init_val
+      clt.sender_sig = req.segment.window.sender_sig
+    # msg
+    self.msg = None
+    if req.segment.msg is not None:
+      self.msg = gsm.NatResponse(req.segment.msg, gsm.NAT_MSG.ADDRESS, clt)
+      msg = bytes(self.msg)
+    # header  
+    checksum = write_u16(clt.checksum_init)
+    signature = write_u16(clt.sender_sig)
+    size = SRP_WINDOW_SIZE
+    if self.msg:
+      size = len(msg)
+    data_size = write_u16(size)
+    flags = SRPHeaderFlags.SRP_ID.value | SRPHeaderFlags.ACK.value
+    if SRPHeaderFlags.SYN.name in req.segment.header.flags:
+      flags |= SRPHeaderFlags.SYN.value
+    flags = write_u16(flags)
     seg = write_u16(req.segment.header.seg + 1)
     ack = write_u16(req.segment.header.seg)
-    data = bytearray(checksum + signature + data_size + flags + seg + ack)
+    header = bytearray(checksum + signature + data_size + flags + seg + ack)
+    self.header = SRPHeader(bytes(header))
     # window
-    tail = bytes([0x0A, 0x00])
-    sender_sig = bytes([0x02, 0x00])
-    checksum_init = bytes([0x00, 0x00])
-    window_buf_size = bytes([0x18, 0x02])
-    data.extend(tail + sender_sig + checksum_init + window_buf_size)
+    self.window = None
+    if req.segment.window is not None:
+      tail = write_u16(10)
+      sender_sig = write_u16(2)
+      checksum_init = write_u16(0)
+      window_buf_size = write_u16(0x218)
+      window = bytes(tail + sender_sig + checksum_init + window_buf_size)
+      self.window = SRPWindow(window)
 
-    segment = SRPSegment(bytes(data))
-    checksum = segment.__make_checksum(bytes(data))
-    segment.header.checksum = checksum[0] + (checksum[1] << 8)
-    return segment
-  
-  def __make_checksum(self, data: bytes):
-    """Calculates SRP checksum of the segment (u16)."""
+    if self.msg:
+      header.extend(msg)
+    elif self.window:
+      header.extend(window)
+    checksum = SRPResponse.__make_checksum(bytes(header))
+    self.header.checksum = checksum[0] + (checksum[1] << 8)
+
+  def __repr__(self):
+    result = ""
+    for flag in self.header.flags:
+      if flag != SRPHeaderFlags.SRP_ID.name:
+        if len(result) > 0:
+          result += f'+{flag}'
+        else:
+          result += f'{flag}'
+    msg = self.msg if self.msg else ""
+    if msg != "":
+      msg = f'\n{msg}'
+    return f'<RES: {result if result != SRPHeaderFlags.ACK.name else "MSG"}>{msg}'
+
+  def __bytes__(self):
+    result = bytearray(bytes(self.header))
+    if self.msg:
+      result.extend(bytes(self.msg))
+    elif self.window:
+      result.extend(bytes(self.window))
+    return bytes(result)
+
+  def __make_checksum(data: bytes):
+    """Calculates SRP checksum for the segment (u16)."""
     trunc_pos = 0
     check_base = 0
     half_len = len(data) >> 1
@@ -162,21 +221,3 @@ class SRPSegment:
     checksum += checksum >> 16
     checksum = ~checksum & 0xFFFF
     return write_u16(checksum)
-  
-class SRPResponse:
-  """SRP response."""
-  def __init__(self, req: SRPRequest):
-    self.segment = SRPSegment.from_req(req)
-
-  def __repr__(self):
-    result = ""
-    for flag in self.segment.header.flags:
-      if flag != SRPHeaderFlags.SRP_ID.name:
-        if len(result) > 0:
-          result += f'+{flag}'
-        else:
-          result += f'{flag}'
-    return f'<RES: {result}>'
-
-  def __bytes__(self):
-    return bytes(self.segment)
