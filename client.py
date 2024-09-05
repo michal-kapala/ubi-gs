@@ -24,6 +24,7 @@ class NatClient(UdpClient):
     super().__init__(addr)
     self.checksum_init = checksum_init
     self.sender_sig = sender_sig
+    self.segment_id = 0
 
   def find(addr: tuple[str, int], clients: list[typing.Self]):
     """Searches for the address in the list and returns the client if found."""

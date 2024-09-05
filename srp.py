@@ -157,7 +157,8 @@ class SRPResponse:
     if SRPHeaderFlags.SYN.name in req.segment.header.flags:
       flags |= SRPHeaderFlags.SYN.value
     flags = write_u16(flags)
-    seg = write_u16(req.segment.header.seg + 1)
+    seg = write_u16(clt.segment_id)
+    clt.segment_id += 1
     ack = write_u16(req.segment.header.seg)
     header = bytearray(checksum + signature + data_size + flags + seg + ack)
     self.header = SRPHeader(bytes(header))
