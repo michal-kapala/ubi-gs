@@ -136,7 +136,7 @@ class SRPSegment:
   
 class SRPResponse:
   """SRP response."""
-  def __init__(self, req: SRPRequest, clt: client.NatClient, port = 8888):
+  def __init__(self, req: SRPRequest, clt: client.NatClient, port = 8888, type = gsm.NAT_MSG.PORT_ID):
     # save window data on SYN
     if req.segment.window is not None:
       clt.checksum_init = req.segment.window.checksum_init_val
@@ -144,7 +144,7 @@ class SRPResponse:
     # msg
     self.msg = None
     if req.segment.msg is not None:
-      self.msg = gsm.NatResponse(req.segment.msg, gsm.NAT_MSG.PORT_ID, clt, port)
+      self.msg = gsm.NatResponse(req.segment.msg, type, clt, port)
       msg = bytes(self.msg)
     # header  
     checksum = write_u16(clt.checksum_init)
