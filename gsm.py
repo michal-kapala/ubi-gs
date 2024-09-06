@@ -522,7 +522,7 @@ class JoinLobbyResponse(GSMResponse):
 
 class NatResponse(GSMResponse):
   """Response to `NAT` messages."""
-  def __init__(self, req: Message, subtype: NAT_MSG, clt: client.UdpClient):
+  def __init__(self, req: Message, subtype: NAT_MSG, clt: client.UdpClient, port: int):
     if req.header.type != MESSAGE_TYPE.NAT:
       raise TypeError(f"NatResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -530,5 +530,4 @@ class NatResponse(GSMResponse):
     self.header.type = MESSAGE_TYPE.NAT
     socketId = req.dl.lst[1][0]
     ip = str(utils.ipv4_to_u32(clt.addr))
-    port = str(clt.port)
-    self.dl = List([str(subtype.value), [socketId, ip, port]])
+    self.dl = List([str(subtype.value), [socketId, ip, str(port)]])

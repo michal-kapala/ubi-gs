@@ -81,3 +81,9 @@ def ipv4_to_u32(ip: str):
   """Converts IPv4 address into integer representation."""
   result = socket.inet_aton(ip)
   return read_u32(result)
+
+def read_ipv4(ip: bytes):
+  """Reads IPv4 address from a network buffer (LE)."""
+  if len(ip) != 4:
+    raise BufferError("Invalid IPv4 address buffer size")
+  return socket.inet_ntoa(ip[::-1])
