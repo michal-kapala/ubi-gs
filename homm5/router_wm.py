@@ -2,7 +2,7 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import gsm, pkc, client
+import gsm, pkc, client, group
 
 SERVER_ADDRESS = ('localhost', 7782)
 """Address of the router's wait module service."""
@@ -15,6 +15,13 @@ LOBBY_SERVER = ('localhost', 7785)
 
 CLIENTS: list[client.TcpClient] = []
 """Global list of connected game clients."""
+
+LOBBIES: list[group.Lobby] = [
+  group.Lobby(1, "Casual", "", gsm.GAME_MODE.STANDARD),
+  group.Lobby(2, "Ranked", "", gsm.GAME_MODE.RATING),
+  group.Lobby(3, "1v1", "", gsm.GAME_MODE.DUEL)
+]
+"""Global list of available server lists."""
 
 def handle_req(clt: client.TcpClient, req: gsm.Message):
   """Handler for `gsm.Message` requests."""
@@ -44,7 +51,7 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
           res = gsm.LobbyMsgResponse(req)
         case gsm.LOBBY_MSG.CHANGE_REQUESTED_LOBBIES:
           game_name = req.dl.lst[1][0]
-          res = gsm.GroupInfoResponse(req, clt)
+          res = gsm.GroupInfoResponse(req, LOBBIES)
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case gsm.MESSAGE_TYPE.KEY_EXCHANGE:

@@ -392,13 +392,16 @@ class ProxyHandlerResponse(GSMResponse):
     else:
       match subtype:
         case "1":
-          module_info = ["persistantdata", "0", "0"]
-          proxy_info_key = "1"
-          proxy_info = [[proxy_info_key, proxy_addr[0], str(proxy_addr[1])]]
+          # 'persistantdata', 'ladderquery'
+          module_name = req.dl.lst[1][0]
+          module_info = [module_name, "0", "0"]
+          sv_id = "1"
+          proxy_info = [[sv_id, proxy_addr[0], str(proxy_addr[1])]]
           module_info.append(proxy_info)
           self.dl = List([result, [subtype, module_info]])
         case "2":
-          self.dl = List([result, [subtype, ["1"]]])
+          module_id = req.dl.lst[1][0]
+          self.dl = List([result, [subtype, [module_id]]])
         case _:
           raise BufferError(f"Unknown PROXY_HANDLER message subtype {subtype}")
 
@@ -465,7 +468,7 @@ class LobbyMsgResponse(GSMResponse):
 
 class GroupInfoResponse(GSMResponse):
   """Response to `LOBBY_MSG.CHANGE_REQUESTED_LOBBIES` messages."""
-  def __init__(self, req: Message, clt: client.TcpClient):
+  def __init__(self, req: Message, lobbies: list[Lobby]):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
       raise TypeError(f"InfoRefreshResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -475,8 +478,10 @@ class GroupInfoResponse(GSMResponse):
     group_id = "1"
     flag = str(0x100)
     is_rooms = "0"
-    lobby = Lobby("Heroes V in 2024?!?", clt.username, GAME_MODE.STANDARD)
-    self.dl = List([msg_id, [group_id, flag, [is_rooms], [lobby.to_list()]]])
+    server_lists = []
+    for lobby in lobbies:
+      server_lists.append(lobby.to_list())
+    self.dl = List([msg_id, [group_id, flag, [is_rooms], server_lists]])
 
 class JoinLobbyServerResponse(GSMResponse):
   """Response to `LOBBY_MSG.JOIN_SERVER` messages."""
@@ -531,3 +536,17 @@ class NatResponse(GSMResponse):
     socketId = req.dl.lst[1][0]
     ip = str(utils.ipv4_to_u32(clt.addr))
     self.dl = List([str(subtype.value), [socketId, ip, str(port)]])
+
+class GetGroupInfoResponse(GSMResponse):
+  """Response to `LOBBY_MSG.GROUP_INFO_GET` messages."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"GetGroupInfoResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = str(LOBBY_MSG.GROUP_INFO_GET.value)
+    group_id = req.dl.lst[1][0]
+    room_id = "0"
+    self.dl = List([result, [subtype, [group_id, room_id]]])

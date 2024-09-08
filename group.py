@@ -15,10 +15,10 @@ class GAME_MODE(Enum):
 
 class Group(ABC):
   """Base class for lobbies and rooms."""
-  def __init__(self, name: str, master: str, game_mode: GAME_MODE):
+  def __init__(self, id: int, name: str, master: str, game_mode: GAME_MODE):
     self.group_type = GROUP_TYPE.LOBBY.value
     self.group_name = name
-    self.group_id = 1
+    self.group_id = id
     self.lobby_sv_id = 1
     self.parent_id = 0
     self.config = 0
@@ -35,9 +35,9 @@ class Group(ABC):
     pass
 
 class Lobby(Group):
-  """Top-level gathering of players."""
-  def __init__(self, name: str, master: str, game_mode: GAME_MODE):
-    super().__init__(name, master, game_mode)
+  """Top-level group (server list)."""
+  def __init__(self, id: int, name: str, master: str, game_mode: GAME_MODE):
+    super().__init__(id, name, master, game_mode)
     self.group_type = GROUP_TYPE.LOBBY.value
     self.nb_members = 0
     self.max_members = 8
@@ -62,8 +62,8 @@ class Lobby(Group):
 
 class Room(Group):
   """Represents a group of players waiting for a game to begin."""
-  def __init__(self, name: str, master: str, game_mode: GAME_MODE):
-    super().__init__(name, master, game_mode)
+  def __init__(self, id: int, name: str, master: str, game_mode: GAME_MODE):
+    super().__init__(id, name, master, game_mode)
     self.group_type = GROUP_TYPE.ROOM.value
     self.nb_players = 0
     self.max_players = 8

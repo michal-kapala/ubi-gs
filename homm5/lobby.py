@@ -26,14 +26,14 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
       match subtype:
         case gsm.LOBBY_MSG.JOIN_SERVER:
           res = gsm.JoinLobbyServerResponse(req, SERVER_ADDRESS)
+        case gsm.LOBBY_MSG.GROUP_INFO_GET:
+          group_id = int(req.dl.lst[1][0])
+          res = gsm.GetGroupInfoResponse(req)
         case gsm.LOBBY_MSG.LOGIN:
           game_name = req.dl.lst[1][0]
           res = gsm.LobbyMsgResponse(req)
         case gsm.LOBBY_MSG.JOIN_LOBBY:
           res = gsm.JoinLobbyResponse(req)
-        case gsm.LOBBY_MSG.CHANGE_REQUESTED_LOBBIES:
-          game_name = req.dl.lst[1][0]
-          res = gsm.GroupInfoResponse(req, clt)
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case _:
