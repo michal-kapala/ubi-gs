@@ -2,24 +2,24 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import gsm, pkc, client, group
+import gsm, pkc, client, group, h5
 
-SERVER_ADDRESS = ('localhost', 7782)
+SERVER_ADDRESS = h5.ENDPOINTS["router_wm"]
 """Address of the router's wait module service."""
 
-PROXY = ('localhost', 7783)
+PROXY = h5.ENDPOINTS["proxy"]
 """Address of the proxy service the game will be redirected to."""
 
-LOBBY_SERVER = ('localhost', 7785)
+LOBBY_SERVER = h5.ENDPOINTS["lobby"]
 """Address of the lobby service the game will be redirected to."""
 
 CLIENTS: list[client.TcpClient] = []
 """Global list of connected game clients."""
 
 LOBBIES: list[group.Lobby] = [
-  group.Lobby(1, "Casual", "", gsm.GAME_MODE.STANDARD),
-  group.Lobby(2, "Ranked", "", gsm.GAME_MODE.RATING),
-  group.Lobby(3, "1v1", "", gsm.GAME_MODE.DUEL)
+  group.Lobby(1, "Casual", "", h5.GAME_MODE.STANDARD.value),
+  group.Lobby(2, "Ranked", "", h5.GAME_MODE.RATING.value),
+  group.Lobby(3, "1v1", "", h5.GAME_MODE.DUEL.value)
 ]
 """Global list of available server lists."""
 

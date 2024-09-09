@@ -2,9 +2,9 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import gsm, client
+import gsm, client, h5
 
-SERVER_ADDRESS = ('localhost', 7785)
+SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 """Address of the lobby service."""
 
 CLIENTS: list[client.TcpClient] = []

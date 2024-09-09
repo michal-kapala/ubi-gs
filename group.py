@@ -6,16 +6,9 @@ class GROUP_TYPE(Enum):
   LOBBY = 0
   ROOM = 1
 
-class GAME_MODE(Enum):
-  """Heroes of Might and Magic 5 game mode."""
-  STANDARD = 0
-  RATING = 1
-  DUEL = 2
-  DUEL2 = 3
-
 class Group(ABC):
   """Base class for lobbies and rooms."""
-  def __init__(self, id: int, name: str, master: str, game_mode: GAME_MODE):
+  def __init__(self, id: int, name: str, master: str, game_mode: int):
     self.group_type = GROUP_TYPE.LOBBY.value
     self.group_name = name
     self.group_id = id
@@ -27,7 +20,7 @@ class Group(ABC):
     self.allowed_games = ""
     self.games = ""
     self.info = b''
-    self.event_id = game_mode.value
+    self.event_id = game_mode
 
   @abstractmethod
   def to_list(self) -> list:
@@ -36,7 +29,7 @@ class Group(ABC):
 
 class Lobby(Group):
   """Top-level group (server list)."""
-  def __init__(self, id: int, name: str, master: str, game_mode: GAME_MODE):
+  def __init__(self, id: int, name: str, master: str, game_mode: int):
     super().__init__(id, name, master, game_mode)
     self.group_type = GROUP_TYPE.LOBBY.value
     self.nb_members = 0
@@ -62,7 +55,7 @@ class Lobby(Group):
 
 class Room(Group):
   """Represents a group of players waiting for a game to begin."""
-  def __init__(self, id: int, name: str, master: str, game_mode: GAME_MODE):
+  def __init__(self, id: int, name: str, master: str, game_mode: int):
     super().__init__(id, name, master, game_mode)
     self.group_type = GROUP_TYPE.ROOM.value
     self.nb_players = 0

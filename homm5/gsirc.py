@@ -11,9 +11,9 @@ from jaraco.stream import buffer
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import ircm
+import ircm, h5
 
-SERVER_ADDRESS = ('localhost', 7779)
+SERVER_ADDRESS = h5.ENDPOINTS["irc"]
 """Address of the IRC service."""
 
 log = logging.getLogger(__name__)

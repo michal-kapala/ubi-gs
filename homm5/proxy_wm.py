@@ -2,9 +2,9 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import gsm, pkc, client
+import gsm, pkc, client, h5
 
-SERVER_ADDRESS = ('localhost', 7784)
+SERVER_ADDRESS = h5.ENDPOINTS["proxy_wm"]
 """Address of the proxy's wait module service."""
 
 CLIENTS: list[client.TcpClient] = []

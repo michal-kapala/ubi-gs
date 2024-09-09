@@ -2,12 +2,12 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import gsm, pkc, client
+import gsm, pkc, client, h5
 
-SERVER_ADDRESS = ('localhost', 7783)
+SERVER_ADDRESS = h5.ENDPOINTS["proxy"]
 """Address of the proxy service."""
 
-WAIT_MODULE = ("127.0.0.1", 7784)
+WAIT_MODULE = h5.ENDPOINTS["proxy_wm"]
 """Address of the wait module service the game will be redirected to."""
 
 CLIENTS: list[client.TcpClient] = []

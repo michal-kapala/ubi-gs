@@ -1,7 +1,7 @@
 from enum import Enum
 import blowfish, gsxor, pkc, client, utils
 from data import List
-from group import Lobby, GAME_MODE
+from group import Lobby
 
 GSMSG_HEADER_SIZE = 6
 """Length of `GSMessageHeader` in bytes."""

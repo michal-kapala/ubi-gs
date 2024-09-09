@@ -2,9 +2,9 @@ import socket, sys, os
 # relative module import stuff
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
-import srp, client, utils, gsm
+import srp, client, utils, gsm, h5
 
-SERVER_ADDRESS = ('localhost', 7781)
+SERVER_ADDRESS = h5.ENDPOINTS["nat"]
 """Address of the NAT service."""
 
 CLIENTS: list[client.NatClient] = []
