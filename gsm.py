@@ -379,7 +379,7 @@ class PlayerInfoResponse(GSMResponse):
 
 class ProxyHandlerResponse(GSMResponse):
   """Response to `PROXY_HANDLER` messages."""
-  def __init__(self, req: Message, proxy_addr: tuple[str, int]):
+  def __init__(self, req: Message, proxy_addr: tuple[str, int], proxy_id = 0):
     if req.header.type != MESSAGE_TYPE.PROXY_HANDLER:
       raise TypeError(f"ProxyHandlerResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -392,13 +392,19 @@ class ProxyHandlerResponse(GSMResponse):
     else:
       match subtype:
         case "1":
-          # 'persistantdata', 'ladderquery'
           module_name = req.dl.lst[1][0]
-          module_info = [module_name, "0", "0"]
-          sv_id = "1"
-          proxy_info = [[sv_id, proxy_addr[0], str(proxy_addr[1])]]
-          module_info.append(proxy_info)
-          self.dl = List([result, [subtype, module_info]])
+          match module_name:
+            case "persistantdata" | "ladderquery":
+              module_info = [module_name, "0", "0"]
+              proxy_info = [[str(proxy_id), proxy_addr[0], str(proxy_addr[1])]]
+              module_info.append(proxy_info)
+              self.dl = List([result, [subtype, module_info]])
+            case "remotealgorithm":
+              raise NotImplementedError("Remote algorithm proxy module unsupported")
+            case "clanservice":
+              raise NotImplementedError("Clan service proxy module unsupported")
+            case _:
+              raise NotImplementedError(f"Request for unknown proxy module {module_name}")
         case "2":
           module_id = req.dl.lst[1][0]
           self.dl = List([result, [subtype, [module_id]]])

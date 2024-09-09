@@ -4,10 +4,10 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, pkc, client, h5
 
-SERVER_ADDRESS = h5.ENDPOINTS["proxy"]
-"""Address of the proxy service."""
+SERVER_ADDRESS = h5.ENDPOINTS["ladder_proxy"]
+"""Address of the score/ladder query proxy module service."""
 
-WAIT_MODULE = h5.ENDPOINTS["proxy_wm"]
+WAIT_MODULE = h5.ENDPOINTS["ladder_proxy_wm"]
 """Address of the wait module service the game will be redirected to."""
 
 CLIENTS: list[client.TcpClient] = []

@@ -7,8 +7,11 @@ import gsm, pkc, client, group, h5
 SERVER_ADDRESS = h5.ENDPOINTS["router_wm"]
 """Address of the router's wait module service."""
 
-PROXY = h5.ENDPOINTS["proxy"]
-"""Address of the proxy service the game will be redirected to."""
+PERSISTENCE_PROXY = h5.ENDPOINTS["pers_proxy"]
+"""Address of the persistent data proxy module service the game will be redirected to."""
+
+LADDER_PROXY = h5.ENDPOINTS["ladder_proxy"]
+"""Address of the ladder query proxy module service the game will be redirected to."""
 
 LOBBY_SERVER = h5.ENDPOINTS["lobby"]
 """Address of the lobby service the game will be redirected to."""
@@ -40,7 +43,28 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
       if str(type(req.dl.lst[0])) == "<class 'list'>":
         pass
       else:
-        res = gsm.ProxyHandlerResponse(req, PROXY)
+        subtype = req.dl.lst[0]
+        if subtype == "1":
+          proxy_id = None
+          module = req.dl.lst[1][0]
+          match module:
+            case "persistantdata":
+              proxy = PERSISTENCE_PROXY
+              proxy_id = h5.PROXY_MODULE.PERSISTENT_DATA.value
+            case "ladderquery":
+              proxy = LADDER_PROXY
+              proxy_id = h5.PROXY_MODULE.LADDER_QUERY.value
+            case "remotealgorithm":
+              raise NotImplementedError(f"Remote algorithm proxy module unsupported")
+            case "clanservice":
+              raise NotImplementedError(f"Clan service proxy module unsupported")
+            case _:
+              raise NotImplementedError(f"Request for unknown proxy module {module}")
+          print(f"proxy id: {proxy_id}")
+          res = gsm.ProxyHandlerResponse(req, proxy, proxy_id)
+        else:
+          # proxy address doesnt matter here
+          res = gsm.ProxyHandlerResponse(req, PERSISTENCE_PROXY)
     case gsm.MESSAGE_TYPE.LOBBY_MSG:
       subtype = gsm.LOBBY_MSG(int(req.dl.lst[0]))
       match subtype:
