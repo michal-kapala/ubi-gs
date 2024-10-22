@@ -3,6 +3,5 @@ GSConnect web service emulates legacy `http://gsconnect.ubisoft.com` common for 
 
 ## Usage
 ```
-pip install flask
 python gsconnect.py
 ```
