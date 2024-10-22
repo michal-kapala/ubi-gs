@@ -7,6 +7,12 @@ It allowed for implementation of user auth, friends, matchmaking, in-game chat, 
 The games published by Ubisoft ca. 2000-2005 used `gsconnect.ubisoft.com` for online config, along with a dedicated network protocol suite for game server communication.
 
 ## Usage
+
+To install all dependencies, run:
+```
+pip install -r requirements.txt
+```
+
 See dedicated READMEs for service usage info:
 
 | Directory | Description |
