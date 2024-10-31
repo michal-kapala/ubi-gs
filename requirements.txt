@@ -1,4 +1,5 @@
 Flask==2.2.3
+Werkzeug==2.3.8
 irc==20.5.0
 jaraco.util==15.0.0
 rsa==4.9
