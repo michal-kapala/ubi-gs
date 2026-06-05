@@ -3,6 +3,7 @@ import socket, sys, os
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, client, h5
+from group import Room
 
 SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 """Address of the lobby service."""
@@ -10,8 +11,15 @@ SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 CLIENTS: list[client.TcpClient] = []
 """Global list of connected game clients."""
 
+rooms: list[Room] = []
+"""Global list of active rooms (player-viewed lobbies)."""
+
+next_room_id = 1000
+"""Global room id assignment counter."""
+
 def handle_req(clt: client.TcpClient, req: gsm.Message):
   """Handler for `gsm.Message` requests."""
+  global next_room_id
   res = None
   match req.header.type:
     case gsm.MESSAGE_TYPE.STILLALIVE:
@@ -20,6 +28,7 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
       clt.username = req.dl.lst[0]
       res = gsm.LoginWaitModuleResponse(req)
     case gsm.MESSAGE_TYPE.LOBBYSERVERLOGIN:
+      clt.username = req.dl.lst[0]
       res = gsm.LobbyServerLoginResponse(req)
     case gsm.MESSAGE_TYPE.LOBBY_MSG:
       subtype = gsm.LOBBY_MSG(int(req.dl.lst[0]))
@@ -30,12 +39,16 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
           group_id = int(req.dl.lst[1][0])
           res = gsm.GetGroupInfoResponse(req)
         case gsm.LOBBY_MSG.CREATE_ROOM:
-          res = gsm.CreateRoomResponse(req)
+          room_id = next_room_id
+          next_room_id = next_room_id + 1
+          res = gsm.CreateRoomResponse(req, rooms, room_id, clt.username)
         case gsm.LOBBY_MSG.LOGIN:
           game_name = req.dl.lst[1][0]
           res = gsm.LobbyMsgResponse(req)
         case gsm.LOBBY_MSG.JOIN_LOBBY:
           res = gsm.JoinLobbyResponse(req)
+        case gsm.LOBBY_MSG.JOIN_ROOM:
+          res = gsm.JoinRoomResponse(req)
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case _:

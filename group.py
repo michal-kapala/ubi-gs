@@ -1,14 +1,65 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import TypedDict
+
+class LSM(Enum):
+  """Lobby Service Mask"""
+  LSM_PRIVATE = 1
+  """Group is password-protected."""
+  LSM_NEEDMASTER = 2
+  """Group needs a master."""
+  LSM_ETERNEL = 4
+  """Group is not deleted when empty."""
+  LSM_ACTIVE = 8
+  """Group is active."""
+  LSM_OPEN = 0x10
+  """Group is open."""
+  LSM_STARTABLE = 0x20
+  """Group can start a game."""
+  LSM_GROUPINFO = 0x40
+  """Request group info on join."""
+  LSM_GROUPMEMBERS = 0x80
+  """Request group members on join."""
+  LSM_CHILDGROUPINFO = 0x100
+  """Request child group info on join."""
+  LSM_ALLINFO = LSM_GROUPINFO | LSM_GROUPMEMBERS | LSM_CHILDGROUPINFO
+  """Request all group infos on join."""
+  LSM_CREATE_SUBLOBBY = 0x200
+  """Group can have child lobbies."""
+  LSM_OPEN_WHEN_ACTIVE = 0x400
+  """Group stays open while active."""
+  LSM_SCORES_SUBMISSION = 0x800
+  """Group allows score submissions."""
+  LSM_MATCHACTIVE = 0x1000
+  """Group has a match in progress."""
+  LSM_REGISTERSERVER = 0x2000
+  """Undocumented flag."""
+  LSM_DEDICATEDSERVER = 0x4000
+  """Group represents a dedicated server."""
+  LSM_JOINRULE = 0x8000
+  """Group access is protected with a rule (passport)."""
+  LSM_CREATERULE = 0x10000
+  """Group creation us protected with a rule (passport)."""
 
 class GROUP_TYPE(Enum):
   """Type of a group."""
   LOBBY = 0
-  ROOM = 1
+  ROOM_DIRECTPLAY_CLIENTSERVER = 1
+  ROOM_DIRECTPLAY_P2P = 2
+  ROOM_HYBRID = 3
+  ROOM_HYBRID_REGSERVER = 4
+  ROOM_UBI_CLIENTHOST = 5
+  ROOM_UBI_CLIENTHOST_REGSERVER = 6
+  ROOM_UBI_P2P = 7
+  ROOM_UBI_GAMESERVER = 8
+  ROOM_UBI_GAMESERVER_REGSERVER = 9
+  ROOM_REGSERVER = 10
+  """REGISTER_SERVER"""
+
 
 class Group(ABC):
   """Base class for lobbies and rooms."""
-  def __init__(self, id: int, name: str, master: str, game_mode: int):
+  def __init__(self, id: int, name: str, master: str, event_id: int):
     self.group_type = GROUP_TYPE.LOBBY.value
     self.group_name = name
     self.group_id = id
@@ -20,7 +71,7 @@ class Group(ABC):
     self.allowed_games = ""
     self.games = ""
     self.info = b''
-    self.event_id = game_mode
+    self.event_id = event_id
 
   @abstractmethod
   def to_list(self) -> list:
@@ -53,21 +104,46 @@ class Lobby(Group):
       str(self.nb_members)
     ]
 
+class RoomCreateData(TypedDict):
+  """Received via `LOBBY_MSG.CREATE_ROOM` requests. Integer types are stored as strings, need conversion if used by the server."""
+  parent_id: int
+  room_name: str
+  game_title: str
+  room_type: int
+  max_players: int
+  max_visitors: int
+  group_info: bytes
+  room_password: str
+  game_version: str
+  gs_version: str
+  alt_group_info: bytes
+
 class Room(Group):
-  """Represents a group of players waiting for a game to begin."""
-  def __init__(self, id: int, name: str, master: str, game_mode: int):
-    super().__init__(id, name, master, game_mode)
-    self.group_type = GROUP_TYPE.ROOM.value
+  """Represents a group of players."""
+  def __init__(self, room_data: RoomCreateData, room_id: int, master: str):
+    room_name = room_data["room_name"]
+    event_id = room_data["event_id"]
+    super().__init__(room_id, room_name, master, event_id)
+    self.group_type = GROUP_TYPE.ROOM_UBI_P2P.value # homm5
+    self.game_title = room_data["game_title"]
+    self.parent_id = room_data["parent_id"]
+    self.max_players = room_data["max_players"]
+    self.max_visitors = room_data["max_visitors"]
+    self.group_info = room_data["group_info"]
+    self.room_password = room_data["room_password"]
+    self.game_version = room_data["game_version"]
+    self.gs_version = room_data["gs_version"]
+    self.alt_group_info = room_data["alt_group_info"]
     self.nb_players = 0
-    self.max_players = 8
     self.nb_visitors = 0
-    self.max_visitors = 8
-    self.game_version = ""
-    self.gs_version = ""
-    self.ip_addr = ""
+    self.ip_addr = "127.0.0.1"
     self.alt_ip_addr = ""
+    self.config = LSM.LSM_ALLINFO.value
+    if self.room_password != "":
+      self.config |= LSM.LSM_PRIVATE.value
 
   def to_list(self):
+    """Serialization to `RoomInfo` struct."""
     return [
       str(self.group_type),
       self.group_name,

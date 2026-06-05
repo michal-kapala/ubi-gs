@@ -1,7 +1,7 @@
 from enum import Enum
 import blowfish, gsxor, pkc, client, utils
 from data import List
-from group import Lobby
+from group import Lobby, Room, RoomCreateData
 
 GSMSG_HEADER_SIZE = 6
 """Length of `GSMessageHeader` in bytes."""
@@ -476,7 +476,7 @@ class GroupInfoResponse(GSMResponse):
   """Response to `LOBBY_MSG.CHANGE_REQUESTED_LOBBIES` messages."""
   def __init__(self, req: Message, lobbies: list[Lobby]):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
-      raise TypeError(f"InfoRefreshResponse constructed from {req.header.type} request.")
+      raise TypeError(f"GroupInfoResponse constructed from {req.header.type} request.")
     super().__init__(req)
     self.header.property = PROPERTY.GS
     self.header.type = MESSAGE_TYPE.LOBBY_MSG
@@ -559,7 +559,7 @@ class GetGroupInfoResponse(GSMResponse):
 
 class CreateRoomResponse(GSMResponse):
   """Response to `LOBBY_MSG.CREATE_ROOM` messages."""
-  def __init__(self, req: Message):
+  def __init__(self, req: Message, rooms: list[Room], room_id: int, master: str):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
       raise TypeError(f"CreateRoomResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -567,18 +567,39 @@ class CreateRoomResponse(GSMResponse):
     self.header.type = MESSAGE_TYPE.LOBBY_MSG
     result = str(MESSAGE_TYPE.GSSUCCESS.value)
     subtype = str(LOBBY_MSG.CREATE_ROOM.value)
-    group_id = req.dl.lst[1][0]
-    room_name = req.dl.lst[1][1]
-    game_title = req.dl.lst[1][2]
-    unknown = req.dl.lst[1][3] # 7
-    max_players = req.dl.lst[1][4]
-    max_visitors = req.dl.lst[1][5]
-    group_info = req.dl.lst[1][6]
-    room_password = req.dl.lst[1][7]
-    game_version = req.dl.lst[1][8] # empty
-    gs_version = req.dl.lst[1][9]
-    alt_group_info = req.dl.lst[1][10] # empty
+    room_data: RoomCreateData = {
+      "parent_id": int(req.dl.lst[1][0]), # parent lobby id
+      "room_name": req.dl.lst[1][1],
+      "game_title": req.dl.lst[1][2],
+      "event_id": int(req.dl.lst[1][3]), # 7 (room type for rooms)
+      "max_players": int(req.dl.lst[1][4]),
+      "max_visitors": int(req.dl.lst[1][5]),
+      "group_info": req.dl.lst[1][6],
+      "room_password": req.dl.lst[1][7],
+      "game_version": req.dl.lst[1][8], # empty
+      "gs_version": req.dl.lst[1][9],
+      "alt_group_info": req.dl.lst[1][10] # empty
+    }
+    room = Room(room_data, room_id, master)
+    rooms.append(room)
     # response data
-    unknown_res_param = "0"
+    room_name = room.group_name
     lobby_server_id = "1"
-    self.dl = List([result, [subtype, [group_id, unknown_res_param, lobby_server_id]]])
+    self.dl = List([result, [subtype, [str(room_id), room_name, lobby_server_id]]])
+
+class JoinRoomResponse(GSMResponse):
+  """Response to `LOBBY_MSG.JOIN_ROOM` messages."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"JoinRoomResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = str(LOBBY_MSG.JOIN_ROOM.value)
+    group_id = req.dl.lst[1][0]
+    room_pwd = req.dl.lst[1][1]
+    flags = int(req.dl.lst[1][2]) # LSM (group flags)
+    room_id = req.dl.lst[1][3]
+    gs_version = req.dl.lst[1][4]
+    self.dl = List([result, [subtype, [group_id]]])
