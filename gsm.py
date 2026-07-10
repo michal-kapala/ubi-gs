@@ -1,7 +1,9 @@
 from enum import Enum
 import blowfish, gsxor, pkc, client, utils
+from client import TcpClient
 from data import List
 from group import Lobby, Room, RoomCreateData
+from typing import Self
 
 GSMSG_HEADER_SIZE = 6
 """Length of `GSMessageHeader` in bytes."""
@@ -197,13 +199,18 @@ class NAT_MSG(Enum):
 class SENDER_RECEIVER(Enum):
   """GSMessage sender/receiver types."""
   R = 1
+  """Router"""
   S = 2
+  """Server"""
   W = 3
   P = 4
+  """Peer/Player"""
   AP = 5
   B = 6
+  """Broadcast?"""
   LP = 7
   UNK = 8
+  """Proxy/NAT-related"""
   G = 9
   A = 10
   PROXY = 11
@@ -230,21 +237,40 @@ class GSMessageHeader:
     result[0] = size[0]
     result[1] = size[1]
     result[2] = size[2]
-    result[3] &= 0x1F
     result[3] |= self.property.value << 6
-    result[3] |= self.priority & 0x20
+    result[3] |= self.priority & 0x3F
     result[4] = self.type.value
     result[5] &= 0xF
     result[5] |= 0x10 * self.sender.value
     result[5] &= 0xF0
     result[5] |= self.receiver.value & 0xF
     return bytes(result)
+  
+  @classmethod
+  def from_params(cls: Self, prop: PROPERTY, priority: int, msg_type: MESSAGE_TYPE, sender: SENDER_RECEIVER, receiver: SENDER_RECEIVER) -> Self:
+    pp = (prop.value << 6) | (priority & 0x3F)
+    sr = (sender.value << 4) | receiver.value
+    # size is calculated after payload encryption
+    bts = bytes([0, 0, 0, pp, msg_type.value & 0xFF, sr])
+    return cls(bts)
 
 class Message:
   """Common message implementation."""
-  def __init__(self, bts: bytes, bf_key: bytes):
-    self.header = GSMessageHeader(bts[:GSMSG_HEADER_SIZE])
-    self.dl = None
+  def __init__(self, bf_key: bytes, in_buf: bytes = None, header: GSMessageHeader = None, dl: List = None):
+    if header is None and in_buf is None:
+      raise ValueError("Insufficient parameters for message construction.")
+    self.header = header if header is not None else GSMessageHeader(in_buf[:GSMSG_HEADER_SIZE])
+    """GSM protocol header."""
+    self.dl = dl
+    """DataList with payload data."""
+    # client request
+    if in_buf is not None:
+      self.decrypt(in_buf, bf_key)
+    # not a server-side notification
+    elif header is None or dl is None:
+      raise ValueError("Insufficient parameters for message construction.")
+
+  def decrypt(self, bts: bytes, bf_key: bytes):
     match self.header.property:
       case PROPERTY.GS:
         if self.header.size > GSMSG_HEADER_SIZE:
@@ -253,6 +279,8 @@ class Message:
       case PROPERTY.GAME:
         pass
       case PROPERTY.GS_ENCRYPT:
+        if bf_key is None:
+          raise ValueError("Attempting blowfish decryption without a key.")
         dec = blowfish.Cipher(bf_key).decrypt(bts[GSMSG_HEADER_SIZE:self.header.size])
         self.dl: List = List.from_buf(bytearray(dec))
 
@@ -265,7 +293,7 @@ class GSMessageBundle:
   def __init__(self, first: Message, data: bytes, clt: client.TcpClient):
     self.msgs = [first]
     while len(data) > 0:
-      msg = Message(bytes(data), clt.sv_bf_key)
+      msg = Message(clt.sv_bf_key, in_buf=data)
       self.msgs.append(msg)
       data = data[msg.header.size:]
 
@@ -304,6 +332,39 @@ class GSMResponse:
   def __repr__(self):
     payload = self.dl or ""
     return f"<{self.header.type.name} RES\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}"
+
+class GSMNotification:
+  """Base class for GS message notifications."""
+  def __init__(self, notif: Message):
+    self.header = notif.header
+    self.dl = notif.dl
+
+  def __bytes__(self):
+    bts = bytearray()
+    dl = None
+    if self.dl is not None:
+      dl = bytearray(bytes(self.dl))
+      dl.pop(0)
+      dl.pop()
+      match self.header.property:
+        case PROPERTY.GS:
+          dl = gsxor.encrypt(bytes(dl))
+          self.header.size = GSMSG_HEADER_SIZE + len(dl)
+        case PROPERTY.GS_ENCRYPT:
+          raise NotImplementedError("GS_ENCRYPT message serialization unsupported.")
+
+    bts.extend(bytes(self.header))
+    if dl is not None:
+      bts.extend(dl)
+    return bytes(bts)
+
+  def __repr__(self):
+    payload = self.dl or ""
+    return f"<{self.header.type.name} NOTIF\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}"
+  
+  def send_tcp(self, clt: TcpClient):
+    # serialization + encryption
+    clt.conn.sendall(bytes(self))
 
 class KeyExchangeResponse(GSMResponse):
   """Response to `KEY_EXCHANGE` messages."""
@@ -544,7 +605,9 @@ class NatResponse(GSMResponse):
     self.dl = List([str(subtype.value), [socketId, ip, str(port)]])
 
 class GetGroupInfoResponse(GSMResponse):
-  """Response to `LOBBY_MSG.GROUP_INFO_GET` messages."""
+  """Response to `LOBBY_MSG.GROUP_INFO_GET` messages.
+
+  A response with the same message type signals an error."""
   def __init__(self, req: Message):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
       raise TypeError(f"GetGroupInfoResponse constructed from {req.header.type} request.")
@@ -600,6 +663,6 @@ class JoinRoomResponse(GSMResponse):
     group_id = req.dl.lst[1][0]
     room_pwd = req.dl.lst[1][1]
     flags = int(req.dl.lst[1][2]) # LSM (group flags)
-    room_id = req.dl.lst[1][3]
+    is_visitor = req.dl.lst[1][3]
     gs_version = req.dl.lst[1][4]
     self.dl = List([result, [subtype, [group_id]]])

@@ -3,15 +3,15 @@ import socket, sys, os
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, client, h5
-from group import Room
+from group import Room, LSM, MemberInfo
 
 SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 """Address of the lobby service."""
 
-CLIENTS: list[client.TcpClient] = []
+g_clients: list[client.TcpClient] = []
 """Global list of connected game clients."""
 
-rooms: list[Room] = []
+g_rooms: list[Room] = []
 """Global list of active rooms (player-viewed lobbies)."""
 
 next_room_id = 1000
@@ -41,14 +41,35 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
         case gsm.LOBBY_MSG.CREATE_ROOM:
           room_id = next_room_id
           next_room_id = next_room_id + 1
-          res = gsm.CreateRoomResponse(req, rooms, room_id, clt.username)
+          res = gsm.CreateRoomResponse(req, g_rooms, room_id, clt.username)
         case gsm.LOBBY_MSG.LOGIN:
           game_name = req.dl.lst[1][0]
           res = gsm.LobbyMsgResponse(req)
         case gsm.LOBBY_MSG.JOIN_LOBBY:
           res = gsm.JoinLobbyResponse(req)
         case gsm.LOBBY_MSG.JOIN_ROOM:
+          group_id = int(req.dl.lst[1][0])
+          room = next((r for r in g_rooms if r.group_id == group_id), None)
           res = gsm.JoinRoomResponse(req)
+          # GROUP_INFO notification
+          if room is not None:
+            header = gsm.GSMessageHeader.from_params(gsm.PROPERTY.GS, 1, gsm.MESSAGE_TYPE.LOBBY_MSG, gsm.SENDER_RECEIVER.S, gsm.SENDER_RECEIVER.P)
+            flags = int(req.dl.lst[1][2]) # LSM (iconfig, group flags)
+            # homm5 always requests all info
+            if flags == LSM.LSM_ALLINFO.value:
+              subtype = str(gsm.LOBBY_MSG.GROUP_INFO.value)
+              # subroom children are not a feature
+              subrooms: list[Room] = []
+              group_members: list[MemberInfo] = []
+              dl = gsm.List([subtype, [str(group_id), str(flags), room.to_list(), subrooms, group_members]])
+              msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
+              notif = gsm.GSMNotification(msg)
+              print(notif)
+              notif.send_tcp(clt)
+            else:
+              raise NotImplementedError(f"Unexpected GROUP_INFO iconfig value: {flags}.")
+          else:
+            raise ValueError("Failed to find the requested room on join.")
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case _:
@@ -63,13 +84,13 @@ def start_server():
     
   while True:
     clt = client.TcpClient(sock.accept())
-    CLIENTS.append(clt)
+    g_clients.append(clt)
     print(f"Connection from {clt.addr}")
     try:
       while True:
         data = clt.conn.recv(4096)
         if data:
-          req = gsm.Message(data, clt.sv_bf_key)
+          req = gsm.Message(clt.sv_bf_key, in_buf=data)
           if req.header.size < len(data):
             bundle = gsm.GSMessageBundle(req, data[req.header.size:], clt)
             print(bundle)
@@ -94,7 +115,7 @@ def start_server():
           break
     finally:
       clt.conn.close()
-      CLIENTS.remove(clt)
+      g_clients.remove(clt)
 
 if __name__ == "__main__":
     start_server()

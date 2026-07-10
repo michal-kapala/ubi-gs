@@ -56,6 +56,18 @@ class GROUP_TYPE(Enum):
   ROOM_REGSERVER = 10
   """REGISTER_SERVER"""
 
+class PLAYER_STATUS(Enum):
+  """Player's online status."""
+  PS_SILENT = 1
+  """The player is limited (doesn't have access to chat, page, etc)."""
+  PS_GAMECONNECTED = 2
+  """The player is playing a game."""
+  PS_GAMEREADY = 4
+  """Not implemented."""
+  PS_MATCHREADY = 8
+  """Not implemented."""
+  PS_MATCHPLAYING = 16
+  """The player is playing a match."""
 
 class Group(ABC):
   """Base class for lobbies and rooms."""
@@ -155,7 +167,7 @@ class Room(Group):
       self.master,
       self.allowed_games,
       self.games,
-      self.info,
+      self.group_info,
       str(self.event_id),
       str(self.max_players),
       str(self.nb_players),
@@ -165,4 +177,29 @@ class Room(Group):
       self.gs_version,
       self.ip_addr,
       self.alt_ip_addr
+    ]
+
+class MemberInfo:
+  """Group member info."""
+  def __init__(self):
+    self.username = ""
+    self.is_visitor = False
+    self.ip_addr = "127.0.0.1"
+    self.alt_ip_addr = "127.0.0.1"
+    self.player_data = b''
+    self.group_ids = []
+    self.ping = -1
+    self.status = int(PLAYER_STATUS.PS_SILENT.value)
+
+  def to_list(self):
+    """Serialization to `MemberJoined` struct."""
+    return [
+      self.username,
+      "1" if self.is_visitor else "0",
+      self.ip_addr,
+      self.alt_ip_addr,
+      self.player_data,
+      self.group_ids,
+      str(self.ping),
+      str(self.status)
     ]

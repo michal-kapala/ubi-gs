@@ -59,7 +59,7 @@ def start_server():
       while True:
         data = clt.conn.recv(4096)
         if data:
-          req = gsm.Message(data, clt.sv_bf_key)
+          req = gsm.Message(clt.sv_bf_key, in_buf=data)
           print(req)
           res = handle_req(clt, req)
           if res:

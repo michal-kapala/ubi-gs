@@ -27,3 +27,4 @@ Python 3 is required for running the scripts (3.11+ recommended).
 An incomplete list of titles using GS SDK:
 - Heroes of Might and Magic V
 - Tom Clancy's Splinter Cell: Chaos Theory
+- Brothers in Arms: Road to Hill 30

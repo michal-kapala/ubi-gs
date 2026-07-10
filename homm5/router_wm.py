@@ -107,7 +107,7 @@ def start_server():
       while True:
         data = clt.conn.recv(4096)
         if data:
-          req = gsm.Message(data, clt.sv_bf_key)
+          req = gsm.Message(clt.sv_bf_key, in_buf=data)
           if req.header.size < len(data):
             bundle = gsm.GSMessageBundle(req, data[req.header.size:], clt)
             print(bundle)

@@ -115,7 +115,7 @@ class SRPSegment:
       if len(data) == SRP_WINDOW_SIZE:
         self.window = SRPWindow(data)
       else:
-        self.msg = gsm.Message(data, b'')
+        self.msg = gsm.Message(b'', in_buf=data)
 
   def __repr__(self):
     result = str(self.header)
