@@ -60,7 +60,7 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
               subtype = str(gsm.LOBBY_MSG.GROUP_INFO.value)
               # subroom children are not a feature
               subrooms: list[Room] = []
-              group_members: list[MemberInfo] = []
+              group_members: list[MemberInfo] = MemberInfo(clt.username, str(group_id)).to_list()
               dl = gsm.List([subtype, [str(group_id), str(flags), room.to_list(), subrooms, group_members]])
               msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
               notif = gsm.GSMNotification(msg)
@@ -70,6 +70,10 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
               raise NotImplementedError(f"Unexpected GROUP_INFO iconfig value: {flags}.")
           else:
             raise ValueError("Failed to find the requested room on join.")
+        case gsm.LOBBY_MSG.GROUP_CONFIG_UPDATE_RES:
+          group_id = int(req.dl.lst[1][0])
+          room = next((r for r in g_rooms if r.group_id == group_id), None)
+          res = gsm.GroupConfigUpdateResultResponse(req, room)
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case _:

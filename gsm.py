@@ -2,7 +2,7 @@ from enum import Enum
 import blowfish, gsxor, pkc, client, utils
 from client import TcpClient
 from data import List
-from group import Lobby, Room, RoomCreateData
+from group import Lobby, Room, RoomCreateData, ROOM_UPDATE_FLAGS
 from typing import Self
 
 GSMSG_HEADER_SIZE = 6
@@ -666,3 +666,44 @@ class JoinRoomResponse(GSMResponse):
     is_visitor = req.dl.lst[1][3]
     gs_version = req.dl.lst[1][4]
     self.dl = List([result, [subtype, [group_id]]])
+
+class GroupConfigUpdateResultResponse(GSMResponse):
+  """Response to `LOBBY_MSG.GROUP_CONFIG_UPDATE_RES` messages."""
+  def __init__(self, req: Message, room: Room):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"GroupConfigUpdateResultResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = str(LOBBY_MSG.GROUP_CONFIG_UPDATE_RES.value)
+    group_id = int(req.dl.lst[1][0])
+    # defines the payload structure
+    flags = int(req.dl.lst[1][1])
+    # list iterator
+    idx = 2
+    if flags & ROOM_UPDATE_FLAGS.DS_FLAGS.value == ROOM_UPDATE_FLAGS.DS_FLAGS.value:
+      # see group.DS_ROOM_UPDATE_FLAGS for details
+      ds_flags = int(req.dl.lst[1][idx])
+      idx += 1
+    if flags & ROOM_UPDATE_FLAGS.MAX_PLAYERS.value == ROOM_UPDATE_FLAGS.MAX_PLAYERS.value:
+      max_players = int(req.dl.lst[1][idx])
+      idx += 1
+      room.max_players = max_players
+    if flags & ROOM_UPDATE_FLAGS.MAX_VISITORS.value == ROOM_UPDATE_FLAGS.MAX_VISITORS.value:
+      max_visitors = int(req.dl.lst[1][idx])
+      idx += 1
+      room.max_visitors = max_visitors
+    if flags & ROOM_UPDATE_FLAGS.PASSWORD.value == ROOM_UPDATE_FLAGS.PASSWORD.value:
+      room_pwd = req.dl.lst[1][idx]
+      idx += 1
+      room.room_password = room_pwd
+    if flags & ROOM_UPDATE_FLAGS.GROUP_INFO.value == ROOM_UPDATE_FLAGS.GROUP_INFO.value:
+      room_info = req.dl.lst[1][idx]
+      idx += 1
+      room.group_info = room_info
+    if flags & ROOM_UPDATE_FLAGS.ALT_GROUP_INFO.value == ROOM_UPDATE_FLAGS.ALT_GROUP_INFO.value:
+      alt_room_info = req.dl.lst[1][idx]
+      idx += 1
+      room.alt_group_info = alt_room_info
+    self.dl = List([result, [subtype, [str(group_id)]]])

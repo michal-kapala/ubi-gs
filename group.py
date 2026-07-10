@@ -69,6 +69,36 @@ class PLAYER_STATUS(Enum):
   PS_MATCHPLAYING = 16
   """The player is playing a match."""
 
+class ROOM_UPDATE_FLAGS(Enum):
+  """Main flags used by `LOBBY_MSG.GROUP_CONFIG_UPDATE_RES` requests."""
+  OPEN = 2
+  """Room is open for joins. Only sent for DS."""
+  SCORE_SUBMISSION = 4
+  """Room submits scores. Only sent for DS."""
+  MAX_PLAYERS = 8
+  """Max players number update."""
+  MAX_VISITORS = 0x10
+  """Max visitors number update."""
+  PASSWORD = 0x20
+  """Room password update."""
+  GROUP_INFO = 0x40
+  """Room group info data update."""
+  DEDICATED_SERVER = 0x200
+  """Room host is a dedicated server."""
+  DS_FLAGS = OPEN | SCORE_SUBMISSION | DEDICATED_SERVER
+  """Dedicated server flags update. See `DS_ROOM_UPDATE_FLAGS`."""
+  ALT_GROUP_INFO = 0x400
+  """Alternative group info data update."""
+
+class DS_ROOM_UPDATE_FLAGS(Enum):
+  """Dedicated server flags used by `LOBBY_MSG.GROUP_CONFIG_UPDATE_RES` requests."""
+  OPEN = 0x10
+  """Room is open for joins."""
+  SCORE_SUBMISSION = 0x800
+  """Room submits scores."""
+  DEDICATED_SERVER = 0x4000
+  """Room host is a dedicated server."""
+
 class Group(ABC):
   """Base class for lobbies and rooms."""
   def __init__(self, id: int, name: str, master: str, event_id: int):
@@ -181,13 +211,13 @@ class Room(Group):
 
 class MemberInfo:
   """Group member info."""
-  def __init__(self):
-    self.username = ""
+  def __init__(self, username: str, group_id: str):
+    self.username = username
     self.is_visitor = False
     self.ip_addr = "127.0.0.1"
     self.alt_ip_addr = "127.0.0.1"
     self.player_data = b''
-    self.group_ids = []
+    self.group_ids = [group_id]
     self.ping = -1
     self.status = int(PLAYER_STATUS.PS_SILENT.value)
 
