@@ -74,6 +74,21 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
           group_id = int(req.dl.lst[1][0])
           room = next((r for r in g_rooms if r.group_id == group_id), None)
           res = gsm.GroupConfigUpdateResultResponse(req, room)
+          # GAME_STARTED notification
+          if room is not None:
+            header = gsm.GSMessageHeader.from_params(gsm.PROPERTY.GS, 1, gsm.MESSAGE_TYPE.LOBBY_MSG, gsm.SENDER_RECEIVER.S, gsm.SENDER_RECEIVER.P)
+            subtype = str(gsm.LOBBY_MSG.GAME_STARTED.value)
+            ip = str(clt.addr[0])
+            alt_ip = ""
+            # tcp 6668, udp 8888?
+            port = "8888"
+            dl = gsm.List([subtype, [str(group_id), b"", port, ip, alt_ip]])
+            msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
+            notif = gsm.GSMNotification(msg)
+            print(notif)
+            notif.send_tcp(clt)
+          else:
+            raise ValueError("Failed to find the requested room on config update.")
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case _:
