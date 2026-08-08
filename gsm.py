@@ -4,6 +4,7 @@ from client import TcpClient
 from data import List
 from group import Lobby, Room, RoomCreateData, ROOM_UPDATE_FLAGS
 from typing import Self
+from h5_data import H5_Room, H5_Serializer
 
 GSMSG_HEADER_SIZE = 6
 """Length of `GSMessageHeader` in bytes."""
@@ -164,6 +165,8 @@ class LOBBY_MSG(Enum):
   GROUP_CONFIG_UPDATE_RES = 31
   UPDATE_PING = 32
   GAME_READY = 33
+  GAME_CONNECTED = 34
+  """Client-side notification, no response needed."""
   PLAYER_BAN = 36
   PLAYER_UNBAN = 40
   UPDATE_GAME_INFO = 41
@@ -622,7 +625,7 @@ class GetGroupInfoResponse(GSMResponse):
 
 class CreateRoomResponse(GSMResponse):
   """Response to `LOBBY_MSG.CREATE_ROOM` messages."""
-  def __init__(self, req: Message, rooms: list[Room], room_id: int, master: str):
+  def __init__(self, req: Message, rooms: list[H5_Room], room_id: int, master: str):
     if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
       raise TypeError(f"CreateRoomResponse constructed from {req.header.type} request.")
     super().__init__(req)
@@ -643,10 +646,12 @@ class CreateRoomResponse(GSMResponse):
       "gs_version": req.dl.lst[1][9],
       "alt_group_info": req.dl.lst[1][10] # empty
     }
-    room = Room(room_data, room_id, master)
+    gs_room = Room(room_data, room_id, master)
+    room_info = H5_Serializer().deserialize_roominfo(room_data["group_info"])
+    room = H5_Room(gs_room, room_info)
     rooms.append(room)
     # response data
-    room_name = room.group_name
+    room_name = gs_room.group_name
     lobby_server_id = "1"
     self.dl = List([result, [subtype, [str(room_id), room_name, lobby_server_id]]])
 
