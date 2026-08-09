@@ -1,7 +1,7 @@
 from enum import Enum
-from ctypes import c_int32
+from ctypes import c_int32, c_uint32
 from group import Room
-from utils import read_u32, read_as_u32_list, read_u16
+from utils import read_u32, read_as_u32_list, read_u16, write_u32, write_u32_list, write_u16
 
 class H5_STREAM_TYPE(Enum):
   """Main file stream type for serialized buffers; names assumed."""
@@ -47,6 +47,16 @@ class H5_Stream:
         raise ValueError("Stream's declared size exceeds the buffer size.")
       self.data = buf[2:self.size + 2]
 
+  def write(self):
+    """Returns a serialized buffer."""
+    buf = bytearray([self.id])
+    if self.size_4b or self.size > 127:
+      buf.extend(write_u32((self.size << 1) | 1))
+    else:
+      buf.append(self.size << 1)
+    buf.extend(self.data)
+    return bytes(buf)
+
   def __len__(self):
     return (5 if self.size_4b else 2) + self.size
 
@@ -70,7 +80,7 @@ class H5_PlayerInfo:
       field = H5_Stream(buf)
       cur_idx = 2
       if field.id == cur_idx and field.size > 0:
-        self.username = field.data.decode('utf-8')
+        self.username = field.data.decode("utf-8")
       else:
         raise ValueError(f"PlayerInfo: missing/invalid field - Username ({cur_idx})")
       pos += len(field)
@@ -120,6 +130,57 @@ class H5_PlayerInfo:
       raise ValueError(f"PlayerInfo: missing/invalid field -  (3)")
     return port, ip
 
+  @staticmethod
+  def write_port_ipv4(port: int, ip: str):
+    """Writes port and IPv4 address; compare with `write_ipv4`"""
+    buf = bytearray()
+    field = H5_Stream()
+
+    field.id = 2
+    field.data = write_u16(port)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 3
+    nbs = ip.split(".")
+    if len(nbs) != 4:
+      raise ValueError(f"PlayerInfo: invalid LocalIP ({field.id}), serialization failed")
+    ip_buf = bytearray()
+    ip_buf.extend(write_u32(int(nbs[0])))
+    ip_buf.extend(write_u32(int(nbs[1])))
+    ip_buf.extend(write_u32(int(nbs[2])))
+    ip_buf.extend(write_u32(int(nbs[3])))
+    field.data = ip_buf
+    field.size = len(field.data)
+    buf.extend(field.write())
+    return bytes(buf)
+
+  def serialize(self):
+    """Returns a serialized buffer."""
+    buf = bytearray()
+    field = H5_Stream()
+
+    field.id = 2
+    field.data = self.username.encode("utf-8")
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 3
+    field.data = H5_Serializer.write_ipv4(self.ext_ip, False)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 4
+    field.data = H5_PlayerInfo.write_port_ipv4(self.local_port, self.local_ip)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 5
+    field.data = write_u32(self.int38)
+    field.size = len(field.data)
+    buf.extend(field.write())
+    return bytes(buf)
+
 class H5_RoomInfo:
   """Data from `group.Room.group_info` buffer (HoMM5)."""
   def __init__(self, buf: bytes = None):
@@ -154,9 +215,9 @@ class H5_RoomInfo:
       """idx = 19"""
       self.max_players: int = 0
       """idx = 20"""
-      self.map_size : int = 0
+      self.map_size: int = 0
       """idx = 21"""
-      self.player_infos = []
+      self.player_infos: list[H5_PlayerInfo] = []
       """idx = 22"""
       self.game_version: int = 0
       """idx = 23"""
@@ -166,7 +227,7 @@ class H5_RoomInfo:
       """idx = 25"""
       self.ubi_send_results_wait: bool = False
       """idx = 26"""
-      self.options: dict[str, tuple[int, str]] = []
+      self.options: dict[str, tuple[int, str]] = {}
       """idx = 27"""
       self.is_arena: bool = False
       """idx = 28"""
@@ -294,16 +355,8 @@ class H5_RoomInfo:
 
       field = H5_Stream(buf[pos:])
       cur_idx = 15
-      if field.id == cur_idx and field.size > 0:
-        # nested field
-        inner_field = H5_Stream(field.data)
-        idx = 2
-        if inner_field.id == idx and inner_field.size > 0:
-          self.map_desc = inner_field.data.decode('utf-8')
-        elif inner_field.size == 0:
-          self.map_desc = ""
-        else:
-          raise ValueError(f"RoomInfo: missing/invalid field - MapDescriptor.Value ({idx})")
+      if field.id == cur_idx:
+        self.map_desc = H5_RoomInfo.read_nested_string(field.data)
       else:
         raise ValueError(f"RoomInfo: missing/invalid field - MapDescriptor ({cur_idx})")
       pos += len(field)
@@ -412,14 +465,7 @@ class H5_RoomInfo:
       field = H5_Stream(buf[pos:])
       cur_idx = 31
       if field.id == cur_idx:
-        inner_field = H5_Stream(field.data)
-        idx = 2
-        if inner_field.id == idx and inner_field.size > 0:
-          self.map_desc_tag = inner_field.data.decode('utf-8')
-        elif inner_field.size == 0:
-          self.map_desc_tag = ""
-        else:
-          raise ValueError(f"RoomInfo: missing/invalid field - MapDescTag.Value ({idx})")
+        self.map_desc_tag = H5_RoomInfo.read_nested_string(field.data)
       else:
         raise ValueError(f"RoomInfo: missing/invalid field - MapDescTag ({cur_idx})")
       pos += len(field)
@@ -427,7 +473,7 @@ class H5_RoomInfo:
       field = H5_Stream(buf[pos:])
       cur_idx = 32
       if field.id == cur_idx and field.size > 0:
-        self.map_goal = field.data.decode('utf-8')
+        self.map_goal = field.data.decode("utf-8")
       elif field.size == 0:
         self.map_goal = ""
       else:
@@ -437,7 +483,7 @@ class H5_RoomInfo:
       field = H5_Stream(buf[pos:])
       cur_idx = 33
       if field.id == cur_idx and field.size > 0:
-        self.arena_map_name = field.data.decode('utf-8')
+        self.arena_map_name = field.data.decode("utf-8")
       elif field.size == 0:
         self.arena_map_name = ""
       else:
@@ -475,6 +521,19 @@ class H5_RoomInfo:
       else:
         raise ValueError(f"RoomInfo: missing/invalid field - Flag110 ({cur_idx})")
       pos += len(field)
+
+  @staticmethod
+  def read_nested_string(buf: bytes):
+    """Reads a string nested inside idx 2 field."""
+    # nested field
+    inner_field = H5_Stream(buf)
+    idx = 2
+    if inner_field.id == idx and inner_field.size > 0:
+      return inner_field.data.decode("utf-8")
+    elif inner_field.size == 0:
+      return ""
+    else:
+      raise ValueError(f"RoomInfo: missing/invalid field - String.Value ({idx})")
 
   @staticmethod
   def read_uints(buf: bytes):
@@ -546,7 +605,7 @@ class H5_RoomInfo:
         for _ in range(count):
           field = H5_Stream(buf[pos:])
           if field.id == 1:
-            keys.append(field.data.decode('utf-8'))
+            keys.append(field.data.decode("utf-8"))
           else:
             raise ValueError(f"RoomInfo: missing/invalid field - Options.Key (1)")
           pos += len(field)
@@ -588,6 +647,290 @@ class H5_RoomInfo:
       raise ValueError(f"RoomInfo: missing/invalid field - Options.StringValue (3)")
     return int_value, str_value
 
+  @staticmethod
+  def write_nested_string(string: str):
+    """Writes a string as nested inside idx 2 field."""
+    field = H5_Stream()
+    field.id = 2
+    field.data = string.encode("utf-8")
+    field.size = len(field.data)
+    return field.write()
+
+  @staticmethod
+  def write_uints(lst: list[int]):
+    """Writes a list of ints as LE uint32s."""
+    buf = bytearray()
+    # count - idx 1
+    field = H5_Stream()
+    field.id = 1
+    field.data = write_u32(len(lst))
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    # data - idx 2
+    field.id = 2
+    field.data = write_u32_list(lst)
+    field.size = len(field.data)
+    buf.extend(field.write())
+    return bytes(buf)
+
+  @staticmethod
+  def write_player_infos(infos: list[H5_PlayerInfo]):
+    """Writes a list of player info structs."""
+    buf = bytearray()
+    # count - idx 3
+    field = H5_Stream()
+    field.id = 3
+    field.data = write_u32(len(infos))
+    field.size = len(field.data)
+    buf.extend(field.write())
+    # unknown value 13 - idx 4
+    field.id = 4
+    field.data = write_u32(13)
+    field.size = len(field.data)
+    buf.extend(field.write())
+    data = bytearray()
+    some_id = 0
+    for info in infos:
+      # info entries - idx 2
+      field.id = 2
+      field.data = info.serialize()
+      field.size = len(field.data)
+      data.extend(field.write())
+      # either ids (starting at 0), positions or zeroes - idx 1
+      field.id = 1
+      field.data = write_u32(some_id)
+      field.size = len(field.data)
+      buf.extend(field.write())
+      some_id += 1
+    
+    buf.extend(data)
+    return bytes(buf)
+
+  @staticmethod
+  def write_options(options: dict[str, tuple[int, str]]):
+    """Writes options (`map<string, int32, string>`)."""
+    buf = bytearray()
+    # count - idx 3
+    field = H5_Stream()
+    field.id = 3
+    field.data = write_u32(len(options))
+    field.size = len(field.data)
+    buf.extend(field.write())
+    # unknown value 13 - idx 4
+    field.id = 4
+    field.data = write_u32(13)
+    field.size = len(field.data)
+    buf.extend(field.write())
+    data = bytearray()
+    for key in options:
+      # keys - idx 1
+      field.id = 1
+      field.data = key.encode("utf-8")
+      field.size = len(field.data)
+      buf.extend(field.write())
+      # values - idx 2
+      field.id = 2
+      field.data = H5_RoomInfo.write_option_values(options[key])
+      field.size = len(field.data)
+      data.extend(field.write())
+
+    buf.extend(data)
+    return bytes(buf)
+
+  @staticmethod
+  def write_option_values(values: tuple[int, str]):
+    """Writes `<int, str>` value pair; the string value is in UTF-16."""
+    buf = bytearray()
+    field = H5_Stream()
+
+    field.id = 2
+    field.data = write_u32(values[0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 3
+    field.data = values[1].encode("utf-16-le")
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    return bytes(buf)
+  
+  def serialize(self):
+    """Returns a serialized buffer."""
+    buf = bytearray()
+    field = H5_Stream()
+
+    field.id = 2
+    field.data = write_u32(c_uint32(self.group_id).value)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 3
+    field.data = write_u32(c_uint32(self.lobby_srv_id).value)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 4
+    field.data = H5_Serializer.write_ipv4(self.host_ip, True)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 6
+    field.data = bytes([1 if self.host_logic_init else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 7
+    field.data = self.group_name.encode("utf-16-le")
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 8
+    field.data = self.password.encode("utf-16-le")
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 9
+    field.data = bytes([1 if self.is_pwd_protected else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 10
+    field.data = bytes([1 if self.ghost_mode else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 11
+    field.data = bytes([1 if self.quick_combat else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 12
+    field.data = bytes([1 if self.fast_combat_turns else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 13
+    field.data = write_u32(c_uint32(self.time_limit).value)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 14
+    field.data = write_u32(self.difficulty_id)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 15
+    field.data = H5_RoomInfo.write_nested_string(self.map_desc)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 19
+    field.data = H5_RoomInfo.write_uints(self.teams)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 20
+    field.data = write_u32(self.max_players)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 21
+    field.data = write_u32(self.map_size)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 22
+    field.data = H5_RoomInfo.write_player_infos(self.player_infos)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 23
+    field.data = write_u32(self.game_version)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 24
+    field.data = bytes([1 if self.is_saved else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 25
+    nbs = self.some_ip.split(".")
+    if len(nbs) != 4:
+      raise ValueError(f"RoomInfo: invalid SomeIP ({field.id}), serialization failed")
+    ip_buf = bytearray()
+    ip_buf.extend(write_u32(int(nbs[0])))
+    ip_buf.extend(write_u32(int(nbs[1])))
+    ip_buf.extend(write_u32(int(nbs[2])))
+    ip_buf.extend(write_u32(int(nbs[3])))
+    field.data = bytes(ip_buf)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 26
+    field.data = bytes([1 if self.ubi_send_results_wait else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 27
+    field.data = H5_RoomInfo.write_options(self.options)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 28
+    field.data = bytes([1 if self.is_arena else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 29
+    field.data = write_u32(self.host_checksum)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 30
+    field.data = write_u32(self.adventure_type)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 31
+    field.data = H5_RoomInfo.write_nested_string(self.map_desc_tag)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 32
+    field.data = self.map_goal.encode("utf-8")
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 33
+    field.data = self.arena_map_name.encode("utf-8")
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 37
+    field.data = write_u32(self.int104)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 38
+    field.data = write_u32(self.int108)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 39
+    field.data = write_u32(self.combat_turn_speed)
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    field.id = 40
+    field.data = bytes([1 if self.flag110 else 0])
+    field.size = len(field.data)
+    buf.extend(field.write())
+
+    return bytes(buf)
+
 class H5_Room:
   """Full room information matchmaking object, includes game-specific data."""
   def __init__(self, room: Room, info: H5_RoomInfo):
@@ -599,9 +942,55 @@ class H5_Serializer:
   def __init__(self):
     self.streams: dict[str, H5_Stream] = {}
 
-  def serialize_roominfo(self, room_info: H5_RoomInfo) -> bytes:
+  def serialize_roominfo(self, room_info: H5_RoomInfo):
     """Serializes `CRoomInfo` structure into a `group.Room.group_info` buffer."""
-    pass
+    # stream 0 - empty
+    struct_stream = H5_Stream()
+    struct_stream.id = H5_STREAM_TYPE.STRUCTURE.value
+    struct_stream.size_4b = False
+    struct_stream.size = 0
+    
+    # stream 1 - room info
+    data_stream = H5_Stream()
+    data_stream.id = H5_STREAM_TYPE.COMPRESSED_DATA.value
+    data_stream.data = room_info.serialize()
+    data_stream.size = len(data_stream.data)
+    # the limit for 1B size is 127
+    data_stream.size_4b = data_stream.size > 127
+
+    # stream 2 - empty
+    raw_data_stream = H5_Stream()
+    raw_data_stream.id = H5_STREAM_TYPE.RAW_DATA.value
+    raw_data_stream.size_4b = False
+    raw_data_stream.size = 0
+
+    # stream 4 - serialization mode (4)
+    mode_stream = H5_Stream()
+    mode_stream.id = H5_STREAM_TYPE.SERIALIZATION_MODE.value
+    mode_stream.size_4b = False
+    mode_stream.size = 4
+    mode_stream.data = write_u32(4)
+
+    # stream 5 - empty
+    table_stream = H5_Stream()
+    table_stream.id = H5_STREAM_TYPE.LOOKUP_TABLE.value
+    table_stream.size_4b = False
+    table_stream.size = 0
+
+    self.streams = {
+      H5_STREAM_TYPE.STRUCTURE.name: struct_stream,
+      H5_STREAM_TYPE.COMPRESSED_DATA.name: data_stream,
+      H5_STREAM_TYPE.RAW_DATA.name: raw_data_stream,
+      H5_STREAM_TYPE.SERIALIZATION_MODE.name: mode_stream,
+      H5_STREAM_TYPE.LOOKUP_TABLE.name: table_stream
+    }
+
+    buf = bytearray(self.streams[H5_STREAM_TYPE.SERIALIZATION_MODE.name].write())
+    buf.extend(self.streams[H5_STREAM_TYPE.COMPRESSED_DATA.name].write())
+    buf.extend(self.streams[H5_STREAM_TYPE.STRUCTURE.name].write())
+    buf.extend(self.streams[H5_STREAM_TYPE.RAW_DATA.name].write())
+    buf.extend(self.streams[H5_STREAM_TYPE.LOOKUP_TABLE.name].write())
+    return bytes(buf)
 
   def deserialize_roominfo(self, buf: bytes) -> H5_RoomInfo:
     """Reads `CRoomInfo` structure from a serialized `group.Room.group_info` buffer."""
@@ -637,3 +1026,22 @@ class H5_Serializer:
     else:
       cl_name = "RoomInfo" if room_info else "PlayerInfo"
       raise ValueError(f"{cl_name}: missing/invalid field - HostIP (2)")
+
+  @staticmethod
+  def write_ipv4(ip: str, room_info: bool):
+    """Writes IPv4 address encoded on 16B. Shared between `RoomInfo` and `PlayerInfo`."""
+    # nested field - idx 2
+    field = H5_Stream()
+    field.id = 2
+    nbs = ip.split(".")
+    if len(nbs) != 4:
+      cl_name = "RoomInfo" if room_info else "PlayerInfo"
+      raise ValueError(f"{cl_name}: invalid IPv4 ({field.id}), serialization failed")
+    buf = bytearray()
+    buf.extend(write_u32(int(nbs[0])))
+    buf.extend(write_u32(int(nbs[1])))
+    buf.extend(write_u32(int(nbs[2])))
+    buf.extend(write_u32(int(nbs[3])))
+    field.data = bytes(buf)
+    field.size = len(field.data)
+    return field.write()
