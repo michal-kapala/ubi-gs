@@ -220,7 +220,7 @@ class H5_RoomInfo:
     if buf is None:
       self.group_id: int = -1
       """idx = 2"""
-      self.lobby_srv_id: int = -1
+      self.lobby_sv_id: int = -1
       """idx = 3"""
       self.host_ip = H5_IP()
       """idx = 4"""
@@ -297,7 +297,7 @@ class H5_RoomInfo:
       field = H5_Stream(buf[pos:])
       cur_idx = 3
       if field.id == cur_idx and field.size == 4:
-        self.lobby_srv_id = c_int32(read_u32(field.data)).value
+        self.lobby_sv_id = c_int32(read_u32(field.data)).value
       else:
         raise ValueError(f"RoomInfo: missing/invalid field - LobbySrvID ({cur_idx})")
       pos += len(field)
@@ -800,7 +800,7 @@ class H5_RoomInfo:
     buf.extend(field.write())
 
     field.id = 3
-    field.data = write_u32(c_uint32(self.lobby_srv_id).value)
+    field.data = write_u32(c_uint32(self.lobby_sv_id).value)
     field.size = len(field.data)
     buf.extend(field.write())
 

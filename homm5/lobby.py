@@ -4,7 +4,7 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, client, h5
 from group import Room, LSM, MemberInfo, PLAYER_STATUS
-from h5_data import H5_Room
+from h5_data import H5_Room, H5_RoomInfo, H5_Serializer
 
 SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 """Address of the lobby service."""
@@ -65,6 +65,8 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
               info.status = int(PLAYER_STATUS.PS_GAMECONNECTED.value)
               info.set_player_info(8888, 0)
               group_members: list[MemberInfo] = info.to_list()
+              # update buffer
+              room.gs_room.group_info = H5_Serializer().serialize_roominfo(room.room_info)
               dl = gsm.List([subtype, [str(group_id), str(flags), room.gs_room.to_list(), subrooms, group_members]])
               msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
               notif = gsm.GSMNotification(msg)
@@ -77,7 +79,11 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
         case gsm.LOBBY_MSG.GROUP_CONFIG_UPDATE_RES:
           group_id = int(req.dl.lst[1][0])
           room = next((r for r in g_rooms if r.gs_room.group_id == group_id), None)
+          if room is None:
+            raise ValueError(f'Room {group_id} not found on GROUP_CONFIG_UPDATE_RES.')
           res = gsm.GroupConfigUpdateResultResponse(req, room)
+          # process group_info buffer
+          room.room_info = H5_Serializer().deserialize_roominfo(room.gs_room.group_info)
         case gsm.LOBBY_MSG.GAME_CONNECTED:
           group_id = int(req.dl.lst[1][0])
         case _:

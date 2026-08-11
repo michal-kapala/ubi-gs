@@ -172,7 +172,7 @@ class Room(Group):
     self.parent_id = room_data["parent_id"]
     self.max_players = room_data["max_players"]
     self.max_visitors = room_data["max_visitors"]
-    self.group_info = room_data["group_info"]
+    self.group_info: bytes = room_data["group_info"]
     self.room_password = room_data["room_password"]
     self.game_version = room_data["game_version"]
     self.gs_version = room_data["gs_version"]
