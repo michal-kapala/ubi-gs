@@ -23,6 +23,14 @@ See dedicated READMEs for service usage info:
 
 Python 3 is required for running the scripts (3.11+ recommended).
 
+# Disclaimers
+
+This project is not maintained by or affiliated with Ubisoft or Nival (formerly Nival Interactive).
+
+All emulated services and tools were developed using techniques of software reverse engineering, on the basis of Ubisoft's end-of-life [announcement](https://www.ubisoft.com/en-us/help/purchases-and-rewards/article/decommissioning-of-online-services-for-older-legacy-ubisoft-games-a-m/000064576) for the game's online services, which implies termination of the [EULA](https://www.ubisoft.com/legal/documents/eula/en-US).
+
+All rights belong to their respective owners.
+
 ## Games
 An incomplete list of titles using GS SDK:
 - Heroes of Might and Magic V
