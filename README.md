@@ -23,7 +23,7 @@ See dedicated READMEs for service usage info:
 
 Python 3 is required for running the scripts (3.11+ recommended).
 
-# Disclaimers
+## Disclaimers
 
 This project is not maintained by or affiliated with Ubisoft or Nival (formerly Nival Interactive).
 
