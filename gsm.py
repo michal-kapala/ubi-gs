@@ -648,6 +648,7 @@ class CreateRoomResponse(GSMResponse):
     }
     gs_room = Room(room_data, room_id, master)
     room_info = H5_Serializer().deserialize_roominfo(room_data["group_info"])
+    print(room_info.__dict__)
     room = H5_Room(gs_room, room_info)
     rooms.append(room)
     # response data

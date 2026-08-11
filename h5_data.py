@@ -60,6 +60,49 @@ class H5_Stream:
   def __len__(self):
     return (5 if self.size_4b else 2) + self.size
 
+class H5_IP:
+  """IPv4 address structure, contains some other information."""
+  def __init__(self, buf: bytes = None):
+    if buf is None:
+      self.checksum = 0
+      self.ip = "0.0.0.0"
+      self.int1 = 0
+      self.int2 = 0
+    else:
+      if len(buf) != 16:
+        raise ValueError("H5_IP: invalid input, deserialization failed")
+      # unknown value
+      self.checksum = read_u32(buf[0:4])
+      ip = read_u32(buf[4:8])
+      pt4 = ip & 0xff
+      pt3 = (ip & 0xff00) >> 8
+      pt2 = (ip & 0xff0000) >> 16
+      pt1 = (ip & 0xff000000) >> 24
+      # confirmed
+      self.ip = f"{pt1}.{pt2}.{pt3}.{pt4}"
+      # unknown, zeroes
+      self.int1 = read_u32(buf[8:12])
+      self.int2 = read_u32(buf[12:16])
+
+  def serialize(self):
+    """Returns a serialized buffer."""
+    buf = bytearray()
+    buf.extend(write_u32(self.checksum))
+    nbs = self.ip.split(".")
+    if len(nbs) != 4:
+      raise ValueError("H5_IP: invalid IPv4 address, serialization failed")
+    ip = int(nbs[0]) << 24
+    ip |= int(nbs[1]) << 16
+    ip |= int(nbs[2]) << 8
+    ip |= int(nbs[3])
+    buf.extend(write_u32(ip))
+    buf.extend(write_u32(self.int1))
+    buf.extend(write_u32(self.int2))
+    return bytes(buf)
+
+  def __repr__(self):
+    return f"'{self.ip}'"
+
 class H5_PlayerInfo:
   def __init__(self, buf: bytes = None):
     if buf is None:
@@ -69,7 +112,7 @@ class H5_PlayerInfo:
       """idx = 3; external (public) IPv4"""
       self.local_port = 0
       """idx = 4; local (private) port"""
-      self.local_ip = ""
+      self.local_ip = H5_IP()
       """idx = 4; local (private) IPv4"""
       self.int38 = 0
       """idx = 5; unknown value"""
@@ -117,21 +160,18 @@ class H5_PlayerInfo:
     if field.id == 2 and field.size == 2:
       port = read_u16(field.data)
     else:
-      raise ValueError(f"PlayerInfo: missing/invalid field -  (3)")
+      raise ValueError(f"PlayerInfo: missing/invalid field - PortIP.Port ({field.id})")
     # ip - idx 3
     field = H5_Stream(buf[len(field):])
     if field.id == 3 and field.size == 16:
-      pt1 = read_u32(field.data)
-      pt2 = read_u32(field.data[4:])
-      pt3 = read_u32(field.data[8:])
-      pt4 = read_u32(field.data[12:])
-      ip = f"{pt1}.{pt2}.{pt3}.{pt4}"
+      # assuming the same 16B structure layout
+      ip = H5_IP(field.data)
     else:
-      raise ValueError(f"PlayerInfo: missing/invalid field -  (3)")
+      raise ValueError(f"PlayerInfo: missing/invalid field - PortIP.IP ({field.id})")
     return port, ip
 
   @staticmethod
-  def write_port_ipv4(port: int, ip: str):
+  def write_port_ipv4(port: int, ip: H5_IP):
     """Writes port and IPv4 address; compare with `write_ipv4`"""
     buf = bytearray()
     field = H5_Stream()
@@ -142,15 +182,8 @@ class H5_PlayerInfo:
     buf.extend(field.write())
 
     field.id = 3
-    nbs = ip.split(".")
-    if len(nbs) != 4:
-      raise ValueError(f"PlayerInfo: invalid LocalIP ({field.id}), serialization failed")
-    ip_buf = bytearray()
-    ip_buf.extend(write_u32(int(nbs[0])))
-    ip_buf.extend(write_u32(int(nbs[1])))
-    ip_buf.extend(write_u32(int(nbs[2])))
-    ip_buf.extend(write_u32(int(nbs[3])))
-    field.data = ip_buf
+    # assuming the same 16B structure layout
+    field.data = ip.serialize()
     field.size = len(field.data)
     buf.extend(field.write())
     return bytes(buf)
@@ -166,7 +199,7 @@ class H5_PlayerInfo:
     buf.extend(field.write())
 
     field.id = 3
-    field.data = H5_Serializer.write_ipv4(self.ext_ip, False)
+    field.data = H5_Serializer.write_ipv4(self.ext_ip)
     field.size = len(field.data)
     buf.extend(field.write())
 
@@ -189,7 +222,7 @@ class H5_RoomInfo:
       """idx = 2"""
       self.lobby_srv_id: int = -1
       """idx = 3"""
-      self.host_ip: str = "0.0.0.0"
+      self.host_ip = H5_IP()
       """idx = 4"""
       self.host_logic_init: bool = False
       """idx = 6"""
@@ -772,7 +805,7 @@ class H5_RoomInfo:
     buf.extend(field.write())
 
     field.id = 4
-    field.data = H5_Serializer.write_ipv4(self.host_ip, True)
+    field.data = H5_Serializer.write_ipv4(self.host_ip)
     field.size = len(field.data)
     buf.extend(field.write())
 
@@ -1009,7 +1042,6 @@ class H5_Serializer:
       raise ValueError("Data stream missing in RoomInfo buffer.")
 
     room_info = H5_RoomInfo(data_stream.data)
-    print(room_info.__dict__)
     return room_info
 
   @staticmethod
@@ -1018,30 +1050,17 @@ class H5_Serializer:
     # nested field - idx 2
     field = H5_Stream(buf)
     if field.id == 2 and field.size == 16:
-      pt1 = read_u32(field.data)
-      pt2 = read_u32(field.data[4:])
-      pt3 = read_u32(field.data[8:])
-      pt4 = read_u32(field.data[12:])
-      return f"{pt1}.{pt2}.{pt3}.{pt4}"
+      return H5_IP(field.data)
     else:
       cl_name = "RoomInfo" if room_info else "PlayerInfo"
       raise ValueError(f"{cl_name}: missing/invalid field - HostIP (2)")
 
   @staticmethod
-  def write_ipv4(ip: str, room_info: bool):
-    """Writes IPv4 address encoded on 16B. Shared between `RoomInfo` and `PlayerInfo`."""
+  def write_ipv4(ip: H5_IP):
+    """Writes IPv4 address structure encoded on 16B. Shared between `RoomInfo` and `PlayerInfo`."""
     # nested field - idx 2
     field = H5_Stream()
     field.id = 2
-    nbs = ip.split(".")
-    if len(nbs) != 4:
-      cl_name = "RoomInfo" if room_info else "PlayerInfo"
-      raise ValueError(f"{cl_name}: invalid IPv4 ({field.id}), serialization failed")
-    buf = bytearray()
-    buf.extend(write_u32(int(nbs[0])))
-    buf.extend(write_u32(int(nbs[1])))
-    buf.extend(write_u32(int(nbs[2])))
-    buf.extend(write_u32(int(nbs[3])))
-    field.data = bytes(buf)
+    field.data = ip.serialize()
     field.size = len(field.data)
     return field.write()
