@@ -84,6 +84,23 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
           res = gsm.GroupConfigUpdateResultResponse(req, room)
           # process group_info buffer
           room.room_info = H5_Serializer().deserialize_roominfo(room.gs_room.group_info)
+          # GROUP_INFO notification
+          header = gsm.GSMessageHeader.from_params(gsm.PROPERTY.GS, 1, gsm.MESSAGE_TYPE.LOBBY_MSG, gsm.SENDER_RECEIVER.S, gsm.SENDER_RECEIVER.P)
+          flags = LSM.LSM_ALLINFO.value # LSM (iconfig, group flags)
+          subtype = str(gsm.LOBBY_MSG.GROUP_INFO.value)
+          # subroom children are not a feature
+          subrooms: list[Room] = []
+          info = MemberInfo(clt.username, str(group_id))
+          info.status = int(PLAYER_STATUS.PS_GAMECONNECTED.value)
+          info.set_player_info(8888, 0)
+          group_members: list[MemberInfo] = info.to_list()
+          # update buffer
+          room.gs_room.group_info = H5_Serializer().serialize_roominfo(room.room_info)
+          dl = gsm.List([subtype, [str(group_id), str(flags), room.gs_room.to_list(), subrooms, group_members]])
+          msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
+          notif = gsm.GSMNotification(msg)
+          print(notif)
+          notif.send_tcp(clt)
         case gsm.LOBBY_MSG.GAME_CONNECTED:
           group_id = int(req.dl.lst[1][0])
         case _:
