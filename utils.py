@@ -1,5 +1,9 @@
 import array, socket
 
+def read_u16(bts: bytes):
+  """Reads a little endian u16."""
+  return bts[0] + (bts[1] << 8)
+
 def read_u16_be(bts: bytes):
   """Reads a big endian u16."""
   return (bts[0] << 8) + bts[1]

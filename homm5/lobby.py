@@ -3,7 +3,8 @@ import socket, sys, os
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, client, h5
-from group import Room, LSM, MemberInfo
+from group import Room, LSM, MemberInfo, PLAYER_STATUS
+from h5_data import H5_Room, H5_RoomInfo, H5_Serializer
 
 SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 """Address of the lobby service."""
@@ -11,7 +12,7 @@ SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 g_clients: list[client.TcpClient] = []
 """Global list of connected game clients."""
 
-g_rooms: list[Room] = []
+g_rooms: list[H5_Room] = []
 """Global list of active rooms (player-viewed lobbies)."""
 
 next_room_id = 1000
@@ -49,7 +50,7 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
           res = gsm.JoinLobbyResponse(req)
         case gsm.LOBBY_MSG.JOIN_ROOM:
           group_id = int(req.dl.lst[1][0])
-          room = next((r for r in g_rooms if r.group_id == group_id), None)
+          room = next((r for r in g_rooms if r.gs_room.group_id == group_id), None)
           res = gsm.JoinRoomResponse(req)
           # GROUP_INFO notification
           if room is not None:
@@ -60,8 +61,13 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
               subtype = str(gsm.LOBBY_MSG.GROUP_INFO.value)
               # subroom children are not a feature
               subrooms: list[Room] = []
-              group_members: list[MemberInfo] = MemberInfo(clt.username, str(group_id)).to_list()
-              dl = gsm.List([subtype, [str(group_id), str(flags), room.to_list(), subrooms, group_members]])
+              info = MemberInfo(clt.username, str(group_id))
+              info.status = int(PLAYER_STATUS.PS_GAMECONNECTED.value)
+              info.set_player_info(8888, 0)
+              group_members: list[MemberInfo] = info.to_list()
+              # update buffer
+              room.gs_room.group_info = H5_Serializer().serialize_roominfo(room.room_info)
+              dl = gsm.List([subtype, [str(group_id), str(flags), room.gs_room.to_list(), subrooms, group_members]])
               msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
               notif = gsm.GSMNotification(msg)
               print(notif)
@@ -72,23 +78,31 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
             raise ValueError("Failed to find the requested room on join.")
         case gsm.LOBBY_MSG.GROUP_CONFIG_UPDATE_RES:
           group_id = int(req.dl.lst[1][0])
-          room = next((r for r in g_rooms if r.group_id == group_id), None)
+          room = next((r for r in g_rooms if r.gs_room.group_id == group_id), None)
+          if room is None:
+            raise ValueError(f'Room {group_id} not found on GROUP_CONFIG_UPDATE_RES.')
           res = gsm.GroupConfigUpdateResultResponse(req, room)
-          # GAME_STARTED notification
-          if room is not None:
-            header = gsm.GSMessageHeader.from_params(gsm.PROPERTY.GS, 1, gsm.MESSAGE_TYPE.LOBBY_MSG, gsm.SENDER_RECEIVER.S, gsm.SENDER_RECEIVER.P)
-            subtype = str(gsm.LOBBY_MSG.GAME_STARTED.value)
-            ip = str(clt.addr[0])
-            alt_ip = ""
-            # tcp 6668, udp 8888?
-            port = "8888"
-            dl = gsm.List([subtype, [str(group_id), b"", port, ip, alt_ip]])
-            msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
-            notif = gsm.GSMNotification(msg)
-            print(notif)
-            notif.send_tcp(clt)
-          else:
-            raise ValueError("Failed to find the requested room on config update.")
+          # process group_info buffer
+          room.room_info = H5_Serializer().deserialize_roominfo(room.gs_room.group_info)
+          # GROUP_INFO notification
+          header = gsm.GSMessageHeader.from_params(gsm.PROPERTY.GS, 1, gsm.MESSAGE_TYPE.LOBBY_MSG, gsm.SENDER_RECEIVER.S, gsm.SENDER_RECEIVER.P)
+          flags = LSM.LSM_ALLINFO.value # LSM (iconfig, group flags)
+          subtype = str(gsm.LOBBY_MSG.GROUP_INFO.value)
+          # subroom children are not a feature
+          subrooms: list[Room] = []
+          info = MemberInfo(clt.username, str(group_id))
+          info.status = int(PLAYER_STATUS.PS_GAMECONNECTED.value)
+          info.set_player_info(8888, 0)
+          group_members: list[MemberInfo] = info.to_list()
+          # update buffer
+          room.gs_room.group_info = H5_Serializer().serialize_roominfo(room.room_info)
+          dl = gsm.List([subtype, [str(group_id), str(flags), room.gs_room.to_list(), subrooms, group_members]])
+          msg = gsm.Message(clt.sv_bf_key, header=header, dl=dl)
+          notif = gsm.GSMNotification(msg)
+          print(notif)
+          notif.send_tcp(clt)
+        case gsm.LOBBY_MSG.GAME_CONNECTED:
+          group_id = int(req.dl.lst[1][0])
         case _:
           raise NotImplementedError(f'No request handler for {subtype.name} lobby message.')
     case _:
@@ -119,6 +133,8 @@ def start_server():
               if res:
                 print(res)
                 clt.conn.sendall(bytes(res))
+              elif req.header.type == gsm.LOBBY_MSG:
+                pass
               elif req.header.type != gsm.MESSAGE_TYPE.STILLALIVE:
                 clt.conn.sendall(data)
           else:

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TypedDict
+from utils import write_u16, write_u32
 
 class LSM(Enum):
   """Lobby Service Mask"""
@@ -39,7 +40,7 @@ class LSM(Enum):
   LSM_JOINRULE = 0x8000
   """Group access is protected with a rule (passport)."""
   LSM_CREATERULE = 0x10000
-  """Group creation us protected with a rule (passport)."""
+  """Group creation is protected with a rule (passport)."""
 
 class GROUP_TYPE(Enum):
   """Type of a group."""
@@ -171,7 +172,7 @@ class Room(Group):
     self.parent_id = room_data["parent_id"]
     self.max_players = room_data["max_players"]
     self.max_visitors = room_data["max_visitors"]
-    self.group_info = room_data["group_info"]
+    self.group_info: bytes = room_data["group_info"]
     self.room_password = room_data["room_password"]
     self.game_version = room_data["game_version"]
     self.gs_version = room_data["gs_version"]
@@ -216,7 +217,7 @@ class MemberInfo:
     self.is_visitor = False
     self.ip_addr = "127.0.0.1"
     self.alt_ip_addr = "127.0.0.1"
-    self.player_data = b''
+    self.player_info = b''
     self.group_ids = [group_id]
     self.ping = -1
     self.status = int(PLAYER_STATUS.PS_SILENT.value)
@@ -228,8 +229,33 @@ class MemberInfo:
       "1" if self.is_visitor else "0",
       self.ip_addr,
       self.alt_ip_addr,
-      self.player_data,
+      self.player_info,
       self.group_ids,
       str(self.ping),
       str(self.status)
     ]
+  
+  def set_player_info(self, port: int, some_nb: int):
+    """Writes to `player_data` buffer."""
+    arr = bytearray()
+    # username
+    arr.extend(bytes(self.username, 'utf8'))
+    # external ip
+    ip_nbs = self.ip_addr.split('.')
+    if len(ip_nbs) != 4:
+      raise ValueError("MemberInfo: invalid IPv4.")
+    for nb in ip_nbs:
+      arr.extend(write_u32(int(nb)))
+    # local port
+    if port <= 0 or port > 65535:
+      raise ValueError("MemberInfo: invalid port.")
+    arr.extend(write_u16(port))
+    # local ip
+    ip_nbs = self.alt_ip_addr.split('.')
+    if len(ip_nbs) != 4:
+      raise ValueError("MemberInfo: invalid IPv4.")
+    for nb in ip_nbs:
+      arr.extend(write_u32(int(nb)))
+    # unknown integer, u32
+    arr.extend(write_u32(some_nb))
+    self.player_info = bytes(arr)
