@@ -2,6 +2,7 @@ from enum import Enum
 from ctypes import c_int32, c_uint32
 from group import Room
 from utils import read_u32, read_as_u32_list, read_u16, write_u32, write_u32_list, write_u16
+from uuid import UUID
 
 class H5_STREAM_TYPE(Enum):
   """Main file stream type for serialized buffers; names assumed."""
@@ -256,7 +257,7 @@ class H5_RoomInfo:
       """idx = 23"""
       self.is_saved: bool = False
       """idx = 24"""
-      self.some_ip: str = ""
+      self.guid: str = ""
       """idx = 25"""
       self.ubi_send_results_wait: bool = False
       """idx = 26"""
@@ -444,15 +445,10 @@ class H5_RoomInfo:
 
       field = H5_Stream(buf[pos:])
       cur_idx = 25
-      # static 16 bytes, assuming IPv4
       if field.id == cur_idx and field.size == 16:
-        pt1 = read_u32(field.data)
-        pt2 = read_u32(field.data[4:])
-        pt3 = read_u32(field.data[8:])
-        pt4 = read_u32(field.data[12:])
-        self.some_ip = f"{pt1}.{pt2}.{pt3}.{pt4}"
+        self.guid = f"{field.data[:4].hex()}-{field.data[4:6].hex()}-{field.data[6:8].hex()}-{field.data[8:10].hex()}-{field.data[10:].hex()}"
       else:
-        raise ValueError(f"RoomInfo: missing/invalid field - UnknownIP ({cur_idx})")
+        raise ValueError(f"RoomInfo: missing/invalid field - GUID ({cur_idx})")
       pos += len(field)
 
       field = H5_Stream(buf[pos:])
@@ -890,15 +886,7 @@ class H5_RoomInfo:
     buf.extend(field.write())
 
     field.id = 25
-    nbs = self.some_ip.split(".")
-    if len(nbs) != 4:
-      raise ValueError(f"RoomInfo: invalid SomeIP ({field.id}), serialization failed")
-    ip_buf = bytearray()
-    ip_buf.extend(write_u32(int(nbs[0])))
-    ip_buf.extend(write_u32(int(nbs[1])))
-    ip_buf.extend(write_u32(int(nbs[2])))
-    ip_buf.extend(write_u32(int(nbs[3])))
-    field.data = bytes(ip_buf)
+    field.data = UUID(self.guid).bytes
     field.size = len(field.data)
     buf.extend(field.write())
 

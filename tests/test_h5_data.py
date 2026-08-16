@@ -28,7 +28,7 @@ class H5_SerializerTests(unittest.TestCase):
     info.player_infos = []
     info.game_version = 0x1003C # 1.60
     info.is_saved = False
-    info.some_ip = "0.0.0.0"
+    info.guid = "00000000-0000-0000-0000-000000000000"
     info.ubi_send_results_wait = False
     info.options = {"autosave_enabled": (0, "0")}
     info.is_arena = False
@@ -97,7 +97,7 @@ class H5_SerializerTests(unittest.TestCase):
     self.assertEqual(room_info.player_infos, [])
     self.assertEqual(room_info.game_version, 0x1003C) # 1.60
     self.assertEqual(room_info.is_saved, False)
-    self.assertEqual(room_info.some_ip, "0.0.0.0")
+    self.assertEqual(room_info.guid, "00000000-0000-0000-0000-000000000000")
     self.assertEqual(room_info.ubi_send_results_wait, False)
     self.assertEqual(room_info.options, {"autosave_enabled": (0, "0")})
     self.assertEqual(room_info.is_arena, False)
