@@ -20,7 +20,8 @@ while True:
   packet_size = len(data)
   # NAT pings
   if packet_size < srp.SRP_HEADER_SIZE:
-    print(f"<REQ: PING>\n{utils.read_ipv4(data)}")
+    payload = utils.read_ipv4(data) if len(data) == 4 else data.hex(' ')
+    print(f"<REQ: PING>\n{payload}")
     sock.sendto(data, address)
   else:
     clt = client.NatClient.find(address, CLIENTS)
