@@ -1,5 +1,6 @@
 from enum import Enum
 from ctypes import c_int32, c_uint32
+import client
 from group import Room
 from utils import read_u32, read_as_u32_list, read_u16, write_u32, write_u32_list, write_u16
 from uuid import UUID
@@ -957,6 +958,7 @@ class H5_Room:
   def __init__(self, room: Room, info: H5_RoomInfo):
     self.gs_room = room
     self.room_info = info
+    self.players: list[client.TcpClient] = []
 
 class H5_Serializer:
   """Equivalent to the original `CStructureSaver` serializer (HoMM5)."""

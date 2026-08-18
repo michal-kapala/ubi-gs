@@ -716,3 +716,16 @@ class GroupConfigUpdateResultResponse(GSMResponse):
       idx += 1
       room.gs_room.alt_group_info = alt_room_info
     self.dl = List([result, [subtype, [str(group_id)]]])
+
+class GroupLeaveResponse(GSMResponse):
+  """Response to `LOBBY_MSG.GROUP_LEAVE` messages. Currently only supports rooms."""
+  def __init__(self, req: Message):
+    if req.header.type != MESSAGE_TYPE.LOBBY_MSG:
+      raise TypeError(f"GroupLeaveResponse constructed from {req.header.type} request.")
+    super().__init__(req)
+    self.header.property = PROPERTY.GS
+    self.header.type = MESSAGE_TYPE.LOBBY_MSG
+    result = str(MESSAGE_TYPE.GSSUCCESS.value)
+    subtype = str(LOBBY_MSG.GROUP_LEAVE.value)
+    group_id = req.dl.lst[1][0]
+    self.dl = List([result, [subtype, [group_id]]])

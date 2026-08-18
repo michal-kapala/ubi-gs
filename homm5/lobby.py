@@ -4,7 +4,7 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(root_dir)
 import gsm, client, h5
 from group import Room, LSM, MemberInfo, PLAYER_STATUS
-from h5_data import H5_Room, H5_RoomInfo, H5_Serializer
+from h5_data import H5_Room, H5_Serializer
 
 SERVER_ADDRESS = h5.ENDPOINTS["lobby"]
 """Address of the lobby service."""
@@ -20,6 +20,7 @@ next_room_id = 1000
 
 def handle_req(clt: client.TcpClient, req: gsm.Message):
   """Handler for `gsm.Message` requests."""
+  global g_rooms
   global next_room_id
   res = None
   match req.header.type:
@@ -36,6 +37,16 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
       match subtype:
         case gsm.LOBBY_MSG.JOIN_SERVER:
           res = gsm.JoinLobbyServerResponse(req, SERVER_ADDRESS)
+        case gsm.LOBBY_MSG.GROUP_LEAVE:
+          group_id = int(req.dl.lst[1][0])
+          res = gsm.GroupLeaveResponse(req)
+          room = next((r for r in g_rooms if r.gs_room.group_id == group_id), None)
+          if room is not None:
+            room.players = [r for r in room.players if r.username != clt.username]
+          # checks static lobby group id range
+          elif group_id not in range(1, 4):
+            raise ValueError(f'Group {group_id} not found on GROUP_LEAVE.')
+          print(f"[INFO] Player {clt.username} left group {group_id}")
         case gsm.LOBBY_MSG.GROUP_INFO_GET:
           group_id = int(req.dl.lst[1][0])
           res = gsm.GetGroupInfoResponse(req)
@@ -51,7 +62,11 @@ def handle_req(clt: client.TcpClient, req: gsm.Message):
         case gsm.LOBBY_MSG.JOIN_ROOM:
           group_id = int(req.dl.lst[1][0])
           room = next((r for r in g_rooms if r.gs_room.group_id == group_id), None)
+          if room is None:
+            raise ValueError(f'Room {group_id} not found on JOIN_ROOM.')
           res = gsm.JoinRoomResponse(req)
+          room.players.append(clt)
+          print(f"[INFO] Player {clt.username} joined room {group_id}")
           # GROUP_INFO notification
           if room is not None:
             header = gsm.GSMessageHeader.from_params(gsm.PROPERTY.GS, 1, gsm.MESSAGE_TYPE.LOBBY_MSG, gsm.SENDER_RECEIVER.S, gsm.SENDER_RECEIVER.P)
