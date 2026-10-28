@@ -1,16 +1,12 @@
-import os, platform, re
+import argparse, os, re
 from flask import Flask, request, send_from_directory, abort, Response
 
 app = Flask(__name__)
 
-# config for game file directories 
-cur_dir = os.getcwd()
-if platform.system() == "Windows":
-    app.config['HOMM5'] = f'{cur_dir}\\static\\homm5'
-    app.config['SP3'] = f'{cur_dir}\\static\\sp3'
-else:
-    app.config['HOMM5'] = f'{cur_dir}/static/homm5'
-    app.config['SP3'] = f'{cur_dir}/static/sp3'
+# config for game file directories, next to this script
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+app.config['HOMM5'] = os.path.join(static_dir, 'homm5')
+app.config['SP3'] = os.path.join(static_dir, 'sp3')
 
 @app.route('/<php_filename>', methods=['GET'])
 def get(php_filename: str) -> Response:
@@ -19,6 +15,8 @@ def get(php_filename: str) -> Response:
     dp = request.args.get('dp')
     game = None
     ini_file = None
+    if dp is None:
+        return 'Missing game id', 400
 
     # remove HoMM5 hash
     if re.search("^HEROES_[a-f0-9]{16}$", dp) is not None:
@@ -65,5 +63,16 @@ def get(php_filename: str) -> Response:
         print(f'Unknown request for {php_filename}')
         return 'Unknown request', 400
 
+def get_args():
+    parser = argparse.ArgumentParser(description='gsconnect.ubisoft.com web service')
+    parser.add_argument('--host', default=os.environ.get('GSCONNECT_HOST', '0.0.0.0'),
+        help='address to listen on (default 0.0.0.0, env GSCONNECT_HOST)')
+    parser.add_argument('--port', type=int, default=int(os.environ.get('GSCONNECT_PORT', '80')),
+        help='port to listen on (default 80, env GSCONNECT_PORT)')
+    # never in public: the debugger console runs code
+    parser.add_argument('--debug', action='store_true', help='Flask debug mode, local testing only')
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80, debug=True)
+    args = get_args()
+    app.run(host=args.host, port=args.port, debug=args.debug)
