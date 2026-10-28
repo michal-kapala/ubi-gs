@@ -8,12 +8,8 @@ NOTIFS = [cdkm.REQUEST_TYPE.DISCONNECT_USER, cdkm.REQUEST_TYPE.STILL_ALIVE]
 SERVER_ADDRESS = h5.ENDPOINTS["cdkey"]
 """Address of the CD-Key service."""
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(SERVER_ADDRESS)
-print(f"CD Key server is listening on port {SERVER_ADDRESS[1]}")
-
-while True:
-  data, address = sock.recvfrom(1024)
+def handle_packet(data: bytes):
+  """Handles a CD-Key request, returns the response buffer if there is one."""
   req = cdkm.CDKeyMessage(data)
   print(req)
   match req.req_type:
@@ -25,13 +21,29 @@ while True:
       res = cdkm.AuthResponse(req)
     case cdkm.REQUEST_TYPE.VALIDATION:
       res = cdkm.ValidationResponse(req)
-    case cdkm.REQUEST_TYPE.PLAYER_STATUS:
-      raise NotImplementedError("Player status requests are unsupported")
-    case cdkm.REQUEST_TYPE.DISCONNECT_USER:
-      raise NotImplementedError("Disconnection requests are unsupported")
-    case cdkm.REQUEST_TYPE.STILL_ALIVE:
-      pass
+    case _:
+      # player status requests are unsupported, the rest are notifications
+      if req.req_type not in NOTIFS:
+        print(f"Unsupported request: {req.req_type.name}")
+      return None
+  print(res)
+  return bytes(res)
 
-  if req.req_type not in NOTIFS:
-    print(res)
-    sock.sendto(bytes(res), address)
+def start_server():
+  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  sock.bind(SERVER_ADDRESS)
+  print(f"CD Key server is listening on port {SERVER_ADDRESS[1]}")
+
+  while True:
+    data, address = sock.recvfrom(1024)
+    # one bad packet must not stop the service
+    try:
+      res = handle_packet(data)
+    except Exception as err:
+      print(f"Bad packet from {address[0]}:{address[1]}: {err!r}")
+      continue
+    if res is not None:
+      sock.sendto(res, address)
+
+if __name__ == "__main__":
+  start_server()

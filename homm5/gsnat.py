@@ -10,18 +10,14 @@ SERVER_ADDRESS = h5.ENDPOINTS["nat"]
 CLIENTS: list[client.NatClient] = []
 """Global list of connected game clients."""
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(SERVER_ADDRESS)
-
-print(f"GSNAT server is listening on port {SERVER_ADDRESS[1]}")
-
-while True:
-  data, address = sock.recvfrom(1024)
+def handle_packet(data: bytes, address: tuple[str, int]):
+  """Handles a NAT service datagram. Returns the packets to send."""
+  packets = []
   packet_size = len(data)
   # NAT pings
   if packet_size < srp.SRP_HEADER_SIZE:
     print(f"<REQ: PING>\n{utils.read_ipv4(data)}")
-    sock.sendto(data, address)
+    packets.append((data, address))
   else:
     clt = client.NatClient.find(address, CLIENTS)
     req = srp.SRPRequest(data)
@@ -33,18 +29,38 @@ while True:
     # ConnectHost (SYN)
     if req.segment.window:
       res = srp.SRPResponse(req, clt, SERVER_ADDRESS[1])
-      sock.sendto(bytes(res), address)
+      packets.append((bytes(res), address))
       print(res)
     # NAT message
     elif req.segment.msg:
       res = srp.SRPResponse(req, clt, SERVER_ADDRESS[1], gsm.NAT_MSG.PORT_ID)
-      sock.sendto(bytes(res), address)
+      packets.append((bytes(res), address))
       print(res)
       res = srp.SRPResponse(req, clt, SERVER_ADDRESS[1], gsm.NAT_MSG.ADDRESS)
-      sock.sendto(bytes(res), address)
+      packets.append((bytes(res), address))
       print(res)
     # Disconnect (FIN)
     if srp.SRPHeaderFlags.FIN.name in req.segment.header.flags:
       if clt is not None and client.NatClient.find((clt.addr, clt.port), CLIENTS):
         CLIENTS.remove(clt)
         print(f'removed client {clt.addr}:{clt.port}')
+  return packets
+
+def start_server():
+  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  sock.bind(SERVER_ADDRESS)
+  print(f"GSNAT server is listening on port {SERVER_ADDRESS[1]}")
+
+  while True:
+    data, address = sock.recvfrom(1024)
+    # one bad packet must not stop the service
+    try:
+      packets = handle_packet(data, address)
+    except Exception as err:
+      print(f"Bad packet from {address[0]}:{address[1]}: {err!r}")
+      continue
+    for packet, addr in packets:
+      sock.sendto(packet, addr)
+
+if __name__ == "__main__":
+  start_server()
