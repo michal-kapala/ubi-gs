@@ -262,8 +262,12 @@ class Message:
   def __init__(self, bf_key: bytes, in_buf: bytes = None, header: GSMessageHeader = None, dl: List = None):
     if header is None and in_buf is None:
       raise ValueError("Insufficient parameters for message construction.")
+    if in_buf is not None and len(in_buf) < GSMSG_HEADER_SIZE:
+      raise BufferError(f"Message shorter than its header ({len(in_buf)}B).")
     self.header = header if header is not None else GSMessageHeader(in_buf[:GSMSG_HEADER_SIZE])
     """GSM protocol header."""
+    if in_buf is not None and self.header.size < GSMSG_HEADER_SIZE:
+      raise BufferError(f"Message size {self.header.size}B is below the header size.")
     self.dl = dl
     """DataList with payload data."""
     # client request
