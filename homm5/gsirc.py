@@ -18,6 +18,34 @@ SERVER_ADDRESS = h5.ENDPOINTS["irc"]
 
 log = logging.getLogger(__name__)
 
+CHAT_FIELDS = 7
+"""Fields of the game's chat payload: `name%color%size%n%n%font%text` (e.g. `alice%16777215%9%0%0%Arial%2alice has joined the game`)."""
+
+SYSTEM_LINE = '2'
+"""Leading type digit of the game's own announcements, e.g. `2alice has joined the game`."""
+
+def sanitize_chat(nick: str, payload: str):
+  """
+  Returns the chat payload as it may be relayed from `nick`, or None to drop it.
+  The game shows the name and formatting from the payload, not the IRC nick, so the name is forced to the sender's,
+  the formatting fields must be plain numbers and a font name, and announcements must be about the sender.
+  """
+  if payload.startswith(':'):
+    payload = payload[1:]
+  fields = payload.split('%', CHAT_FIELDS - 1)
+  if len(fields) != CHAT_FIELDS:
+    return None
+  name, color, size, n1, n2, font, text = fields
+  if not all(re.fullmatch(r'[0-9]{1,10}', f) for f in [color, size, n1, n2]):
+    return None
+  if not re.fullmatch(r'[A-Za-z0-9 _\-]{1,32}', font):
+    return None
+  # control characters could end the line or confuse the game's text renderer
+  text = re.sub(r'[\x00-\x1f\x7f]', '', text)
+  if text.startswith(SYSTEM_LINE) and not text[1:].startswith(f'{nick} '):
+    return None
+  return ':' + '%'.join([nick, color, size, n1, n2, font, text])
+
 class IRCError(Exception):
   """Exception thrown by IRC command handlers to notify client of a server/client error."""
   def __init__(self, code, value):
@@ -116,7 +144,7 @@ class IRCClient(socketserver.BaseRequestHandler):
   def _handle_lines(self, msg: ircm.IRCMessage):
     self.buffer.feed(msg.payload)
     for line in self.buffer:
-      line = line.decode('utf-8')
+      line = line.decode('utf-8', errors='replace')
       print(f'req: {line}')
       self._handle_line(line)
 
@@ -133,16 +161,12 @@ class IRCClient(socketserver.BaseRequestHandler):
           'unknowncommand', f'{command} :Unknown command'
         )
       response = handler(params)
-    except AttributeError as e:
-      log.error(str(e))
-      raise
     except IRCError as e:
       response = f':{self.server.servername} {e.code} {e.value}'
       log.warning(response)
     except Exception as e:
-      response = f':{self.server.servername} ERROR {e!r}'
-      log.error(response)
-      raise
+      # a bad line must not end the client's connection
+      log.error(f'error handling {line!r} from {self.client_ident()}: {e!r}')
 
     if response:
       self._send(response)
@@ -162,9 +186,11 @@ class IRCClient(socketserver.BaseRequestHandler):
 
   def handle_nick(self, params: str):
     """Handle the initial setting of the user's nickname and nick changes."""
-    nick = params
-    if nick[0] == ':':
+    nick = params.strip()
+    if nick.startswith(':'):
       nick = nick[1:]
+    if not nick:
+      raise IRCError.from_name('nonicknamegiven', ':No nickname given')
 
     # Valid nickname?
     if re.search(r'[^a-zA-Z0-9\-\[\]\'`^{}_]', nick):
@@ -237,9 +263,10 @@ class IRCClient(socketserver.BaseRequestHandler):
     channel_names = params.split(' ', 1)[0]  # Ignore keys
     for channel_name in channel_names.split(','):
       r_channel_name = channel_name.strip()
-      
-      if r_channel_name[0] == ':':
+      if r_channel_name.startswith(':'):
         r_channel_name = r_channel_name[1:]
+      if not r_channel_name:
+        raise IRCError.from_name('needmoreparams', 'JOIN :Not enough parameters')
 
       # Valid channel name?
       if not re.match('^#([a-zA-Z0-9_\.])+$', r_channel_name):
@@ -284,10 +311,16 @@ class IRCClient(socketserver.BaseRequestHandler):
   def _send_msg(self, cmd: str, params: str):
     """A generic message handler (e.g. `PRIVMSG` and `NOTICE`)."""
     target, sep, msg = params.partition(' ')
-    if not msg:
+    if not target or not msg:
       raise IRCError.from_name('needmoreparams', cmd + ' :Not enough parameters')
+    if not self.nick:
+      raise IRCError.from_name('notregistered', ':You have not registered')
+    chat = sanitize_chat(self.nick, msg)
+    if chat is None:
+      log.warning(f'dropped {cmd} from {self.client_ident()}: {msg!r}')
+      return
 
-    message = f':{self.client_ident()} {cmd} {target} {msg}'
+    message = f':{self.client_ident()} {cmd} {target} {chat}'
     if target.startswith('#') or target.startswith('$'):
       # Message to channel. Check if the channel exists.
       channel = self.server.channels.get(target)
@@ -385,9 +418,11 @@ class IRCClient(socketserver.BaseRequestHandler):
 
   def handle_mode(self, params: str):
     """Handle `MODE` command which queries/sets the visibility of a user/channel."""
-    target, mode = params.split(' ', 1)
-    if mode[0] == ":":
+    target, sep, mode = params.partition(' ')
+    if mode.startswith(':'):
       mode = mode[1:]
+    if not target or not mode:
+      raise IRCError.from_name('needmoreparams', 'MODE :Not enough parameters')
     self.mode = mode
     # channel mode
     if target[0] in ['#', '&']:
