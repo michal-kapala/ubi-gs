@@ -292,8 +292,16 @@ class Message:
         self.dl: List = List.from_buf(bytearray(dec))
 
   def __repr__(self):
-    payload = self.dl or ""
+    payload = self.redacted() or ""
     return f"<{self.header.type.name}\t{self.header.property.name}\t{self.header.sender.name}->{self.header.receiver.name}\t{self.header.size}B>\n{payload}"
+
+  def redacted(self):
+    """Payload for logs, without the password (router `LOGIN`: username, password, game id, ...)."""
+    if self.dl is None:
+      return None
+    if self.header.type == MESSAGE_TYPE.LOGIN and len(self.dl.lst) >= 3:
+      return List([self.dl.lst[0], '<password>'] + self.dl.lst[2:])
+    return self.dl
 
 class GSMessageBundle:
   """Packet containing 2 or more GS messages."""

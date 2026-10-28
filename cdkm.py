@@ -25,6 +25,9 @@ class REQUEST_TYPE(Enum):
 
 BLOWFISH = Cipher(bytes("SKJDHF$0maoijfn4i8$aJdnv1jaldifar93-AS_dfo;hjhC4jhflasnF3fnd", 'utf8'))
 
+KEY_DATA_REQUESTS = [REQUEST_TYPE.ACTIVATION, REQUEST_TYPE.AUTH, REQUEST_TYPE.VALIDATION, REQUEST_TYPE.DISCONNECT_USER]
+"""Requests whose payload is derived from the player's CD key, kept out of logs."""
+
 class CDKeyMessage:
   def __init__(self, bts: bytes):
     self.type = bts[0]
@@ -37,6 +40,9 @@ class CDKeyMessage:
       self.inner_dl = self.dl.lst[3]
     
   def __repr__(self) -> str:
+    # activation, authorization and validation data derive from the player's CD key
+    if self.req_type in KEY_DATA_REQUESTS and len(self.dl.lst) > 3:
+      return f"<{self.req_type.name}:\t{self.dl.lst[:3] + ['<key data>']}>"
     return f"<{self.req_type.name}:\t{str(self.dl)}>"
 
 class Response:
